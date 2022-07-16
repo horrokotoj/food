@@ -61,6 +61,7 @@ CREATE TABLE RecipeCalendar
     RecipeCalendarID SERIAL PRIMARY KEY,
     RecipeDate DATE NOT NULL,
     RecipeId BIGINT UNSIGNED NOT NULL,
+    Portions FLOAT NOT NULL,
     FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId)
 );
 
@@ -82,7 +83,10 @@ CREATE TABLE ListContents
 	),
     FOREIGN KEY (ShoppingListId) REFERENCES ShoppingLists (ShoppingListId),
     FOREIGN KEY (IngredientId) REFERENCES Ingredients (IngredientId),
-    Quantity FLOAT NOT NULL
+    IngredientName CHAR(255) NOT NULL, 
+    Quantity FLOAT NOT NULL,
+    QuantityAvailable FLOAT,
+    Picked BOOLEAN NOT NULL
 );
 
 INSERT INTO Users (UserName, Pass)
@@ -142,7 +146,7 @@ VALUES
     (2, 14, 5),
     (2, 15, 0.5);
 
-INSERT INTO RecipeCalendar (RecipeDate, RecipeId)
+INSERT INTO RecipeCalendar (RecipeDate, RecipeId, Portions)
 VALUES
-    ("2022-07-15", 1),
-    ("2022-07-16", 2);
+    ("2022-07-15", 1, 4),
+    ("2022-07-16", 2, 4);
