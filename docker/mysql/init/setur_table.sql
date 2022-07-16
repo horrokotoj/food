@@ -22,6 +22,7 @@ CREATE TABLE Recipes
 	RecipeName CHAR(255) NOT NULL,
     RecipeDesc CHAR(255),
     RecipeImage CHAR(255),
+    RecipePortions FLOAT NOT NULL,
     RecipeOwner BIGINT UNSIGNED NOT NULL,
     FOREIGN KEY (RecipeOwner) REFERENCES Users (UserId),
     RegisterDate DATE NOT NULL
@@ -92,11 +93,12 @@ VALUES
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
     RecipeImage,
+    RecipePortions,
     RecipeOwner,
     RegisterDate)
 VALUES
-	('Köttfärsås', "Gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.5UrFhKHsjCzErhgaCjaZ8wHaFj%26pid%3DApi&f=1", 1, "2022-07-12"),
-	('Kräftpasta', "Mycket gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse2.mm.bing.net%2Fth%3Fid%3DOIP.z9agqeFaNLoFxZUIV5QvCAHaE8%26pid%3DApi&f=1", 2, "2022-07-13");
+	('Köttfärsås', "Gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.5UrFhKHsjCzErhgaCjaZ8wHaFj%26pid%3DApi&f=1", 4.0, 1, "2022-07-12"),
+	('Kräftpasta', "Mycket gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse2.mm.bing.net%2Fth%3Fid%3DOIP.z9agqeFaNLoFxZUIV5QvCAHaE8%26pid%3DApi&f=1", 4.0, 2, "2022-07-13");
 
 INSERT INTO Measurements (MeasurementName)
 VALUES
@@ -106,7 +108,7 @@ VALUES
 
 INSERT INTO Ingredients (IngredientName, MeasurementId)
 VALUES
-    ("Köttfärs", 1),
+    ("Nötfärs", 1),
     ("Krossade Tomater", 1),
     ("Gullök", 3),
     ("Vitlöksklyfta", 3),
