@@ -20,6 +20,7 @@ CREATE TABLE Recipes
 (
 	RecipeId SERIAL PRIMARY KEY,
 	RecipeName CHAR(255) NOT NULL,
+    UNIQUE (RecipeName),
     RecipeDesc CHAR(255),
     RecipeImage CHAR(255),
     RecipePortions FLOAT NOT NULL,
@@ -31,13 +32,16 @@ CREATE TABLE Recipes
 CREATE TABLE Measurements
 (
     MeasurementId SERIAL PRIMARY KEY,
-    MeasurementName CHAR(255) NOT NULL
+    MeasurementName CHAR(255) NOT NULL,
+    UNIQUE (MeasurementName)
+
 );
 
 CREATE TABLE Ingredients
 (
 	IngredientId SERIAL PRIMARY KEY,
 	IngredientName CHAR(255) NOT NULL,
+    UNIQUE (IngredientName),
     MeasurementId BIGINT UNSIGNED NOT NULL,
     FOREIGN KEY (MeasurementId) REFERENCES Measurements (MeasurementId)
 );
@@ -68,6 +72,7 @@ CREATE TABLE RecipeCalendar
 CREATE TABLE ShoppingLists
 (
     ShoppingListId SERIAL PRIMARY KEY,
+    ShoppingListName CHAR(255),
     StartDate DATE,
     EndDate DATE
 );
@@ -149,4 +154,6 @@ VALUES
 INSERT INTO RecipeCalendar (RecipeDate, RecipeId, Portions)
 VALUES
     ("2022-07-15", 1, 4),
-    ("2022-07-16", 2, 4);
+    ("2022-07-16", 2, 4),
+    ("2022-07-17", 1, 4),
+    ("2022-07-18", 2, 2);
