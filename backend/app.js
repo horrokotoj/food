@@ -125,19 +125,19 @@ app.get('/measurements', (req, res) => {
 // recipecalendar
 
 app.get('/recipecalendar', (req, res) => {
-  let sql = `select CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar`;
+  let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar`;
   handleQuery(sql, res);
 });
 
 app.get('/recipecalendar/:year/:month/:day', (req, res) => {
-  let sql = `select CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
+  let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
   handleQuery(sql, res);
 });
 
 app.get(
   '/recipecalendar/intervall/:yearstart/:monthstart/:daystart/:yearstop/:monthstop/:daystop',
   (req, res) => {
-    let sql = `select CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate between "${req.params.yearstart}-${req.params.monthstart}-${req.params.daystart}" and "${req.params.yearstop}-${req.params.monthstop}-${req.params.daystop}"`;
+    let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate between "${req.params.yearstart}-${req.params.monthstart}-${req.params.daystart}" and "${req.params.yearstop}-${req.params.monthstop}-${req.params.daystop}"`;
     handleQuery(sql, res);
   }
 );
@@ -165,6 +165,19 @@ app.get(
     handleQuery(sql, res);
   }
 );
+
+// listcontents
+
+app.get('/listcontents', (req, res) => {
+  let sql = `select * from ListContents;`;
+  handleQuery(sql, res);
+});
+
+app.get('/listcontent/:id', (req, res) => {
+  let sql = `select * from ListContents
+    where ShoppingListId = ${req.params.id};`;
+  handleQuery(sql, res);
+});
 
 // post requests
 
@@ -395,7 +408,172 @@ app.delete('/measurement', (req, res) => {
 
 // recipecalendar
 
+app.delete('/recipecalendar', (req, res) => {
+  console.log(req.body);
+  if (req.body.RecipeCalendarId) {
+    let sql = `delete from RecipeCalendar 
+      where RecipeCalendarId = ${req.body.RecipeCalendarId};`;
+    handleQuery(sql, res);
+  } else if (req.body.RecipeDate) {
+    let sql = `delete from RecipeCalendar 
+    where RecipeDate = "${req.body.RecipeDate}";`;
+    handleQuery(sql, res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+app.delete('/recipecalendar/intervall', (req, res) => {
+  console.log(req.body);
+  if (req.body.StartDate && req.body.EndDate) {
+    let sql = `delete from RecipeCalendar 
+      where RecipeDate between "${req.body.StartDate}" and "${req.body.EndDate}";`;
+    handleQuery(sql, res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
 // shoppinglists
+
+app.delete('/shoppinglist', (req, res) => {
+  console.log(req.body);
+  if (req.body.ShoppingListId) {
+    let sql1 = `delete from ListContents where ShoppingListId = ${req.body.ShoppingListId};`;
+    let sql2 = `delete from ShoppingLists where ShoppingListId = ${req.body.ShoppingListId};`;
+    handleMultiQuery([sql1, sql2], res);
+  } else if (req.body.ShoppingListName) {
+    let sql1 = `delete from ListContents 
+      where 
+      ShoppingListId = (
+        select ShoppingListId from ShoppingLists 
+        where ShoppingListName = "${req.body.ShoppingListName}");`;
+    let sql2 = `delete from ShoppingLists 
+    where 
+    ShoppingListName = "${req.body.ShoppingListName}";`;
+    handleMultiQuery([sql1, sql2], res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// listcontents
+
+app.delete('/listcontent', (req, res) => {
+  console.log(req.body);
+  if (req.body.ShoppingListId && req.body.IngredientId) {
+    let sql = `delete from ListContents 
+      where ShoppingListId = ${req.body.ShoppingListId} 
+      and IngredientId = ${req.body.IngredientId};`;
+    handleQuery(sql, res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// patch requests
+
+// recipes
+
+app.patch('/recipe', (req, res) => {
+  console.log(req.body);
+  if (req.body.RecipeId) {
+    let updates = '';
+    if (req.body.RecipeName) {
+      updates = updates.concat(` RecipeName = "${req.body.RecipeName}",`);
+    }
+    if (req.body.RecipeDesc) {
+      updates = updates.concat(` RecipeDesc = "${req.body.RecipeDesc}",`);
+    }
+    if (req.body.RecipeSteps) {
+      updates = updates.concat(` RecipeSteps = "${req.body.RecipeSteps}",`);
+    }
+    if (req.body.RecipeImage) {
+      updates = updates.concat(` RecipeImage = "${req.body.RecipeImage}",`);
+    }
+    if (req.body.RecipePortions) {
+      updates = updates.concat(` RecipePortions = ${req.body.RecipePortions},`);
+    }
+    if (req.body.RecipeOwner) {
+      updates = updates.concat(` RecipeOwner = "${req.body.RecipeOwner}",`);
+    }
+    if (req.body.RegisterDate) {
+      updates = updates.concat(` RegisterDate = "${req.body.RegisterDate}",`);
+    }
+    if (updates === '') {
+      res.sendStatus(400);
+    } else {
+      const newUpdates = updates.slice(0, updates.length - 1);
+      let sql = `update Recipes
+      set ${newUpdates}
+      where RecipeId = ${req.body.RecipeId};`;
+      handleQuery(sql, res);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// ingredients
+
+app.patch('/ingredient', (req, res) => {
+  console.log(req.body);
+  if (req.body.IngredientId) {
+    let updates = '';
+    if (req.body.IngredientName) {
+      updates = updates.concat(
+        ` IngredientName = "${req.body.IngredientName}",`
+      );
+    }
+    if (req.body.MeasurementId) {
+      updates = updates.concat(` MeasurementId = "${req.body.MeasurementId}",`);
+    }
+    if (updates === '') {
+      res.sendStatus(400);
+    } else {
+      const newUpdates = updates.slice(0, updates.length - 1);
+      let sql = `update Ingredients
+      set ${newUpdates}
+      where IngredientId = ${req.body.IngredientId};`;
+      handleQuery(sql, res);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// recipeingredients
+
+app.patch('/recipeingredient', (req, res) => {
+  console.log(req.body);
+  if (req.body.RecipeId && req.body.IngredientId && req.body.Quantity) {
+    let sql = `update RecipeIngredients
+                set Quantity = ${req.body.Quantity}
+                where RecipeId = ${req.body.RecipeId}
+                and IngredientId = ${req.body.IngredientId};`;
+    handleQuery(sql, res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// measurements
+
+app.patch('/measurement', (req, res) => {
+  console.log(req.body);
+  if (req.body.MeasurementId && req.body.MeasurementName) {
+    let sql = `update Measurements
+                set MeasurementName = "${req.body.MeasurementName}"
+                where MeasurementId = ${req.body.MeasurementId};`;
+    handleQuery(sql, res);
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+// recipecalendar
+// shoppinglists
+// listcontents
 
 app.listen('3000', () => {
   console.log('Server running, listening on port 3000');

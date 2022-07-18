@@ -22,6 +22,7 @@ CREATE TABLE Recipes
 	RecipeName CHAR(255) NOT NULL,
     UNIQUE (RecipeName),
     RecipeDesc CHAR(255),
+    RecipeSteps CHAR(255),
     RecipeImage CHAR(255),
     RecipePortions FLOAT NOT NULL,
     RecipeOwner BIGINT UNSIGNED NOT NULL,
@@ -73,6 +74,7 @@ CREATE TABLE ShoppingLists
 (
     ShoppingListId SERIAL PRIMARY KEY,
     ShoppingListName CHAR(255),
+    UNIQUE (ShoppingListName),
     StartDate DATE,
     EndDate DATE
 );
