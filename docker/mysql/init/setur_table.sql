@@ -63,7 +63,7 @@ CREATE TABLE RecipeIngredients
 
 CREATE TABLE RecipeCalendar
 (
-    RecipeCalendarID SERIAL PRIMARY KEY,
+    RecipeCalendarId SERIAL PRIMARY KEY,
     RecipeDate DATE NOT NULL,
     RecipeId BIGINT UNSIGNED NOT NULL,
     Portions FLOAT NOT NULL,

@@ -285,7 +285,7 @@ app.post('/shoppinglist', (req, res) => {
 app.post('/listcontent', (req, res) => {
   console.log(req.body);
   let sql;
-  if (req.body.ShoppingListId) {
+  if (req.body.ShoppingListId && req.body.IngredientId && req.body.Quantity) {
     sql = `select Quantity from ListContents where ShoppingListId = ${req.body.ShoppingListId} and IngredientId = ${req.body.IngredientId};`;
     db.query(sql, (err, rows) => {
       if (err) {
@@ -572,8 +572,101 @@ app.patch('/measurement', (req, res) => {
 });
 
 // recipecalendar
+
+app.patch('/recipecalendar', (req, res) => {
+  console.log(req.body);
+  if (req.body.RecipeCalendarId) {
+    let updates = '';
+    if (req.body.RecipeDate) {
+      updates = updates.concat(` RecipeDate = "${req.body.RecipeDate}",`);
+    }
+    if (req.body.RecipeId) {
+      updates = updates.concat(` RecipeId = ${req.body.RecipeId},`);
+    }
+    if (req.body.Portions) {
+      updates = updates.concat(` Portions = ${req.body.Portions},`);
+    }
+    if (updates === '') {
+      res.sendStatus(400);
+    } else {
+      const newUpdates = updates.slice(0, updates.length - 1);
+      let sql = `update RecipeCalendar
+      set ${newUpdates}
+      where RecipeCalendarId = ${req.body.RecipeCalendarId};`;
+      handleQuery(sql, res);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
 // shoppinglists
+
+app.patch('/shoppinglist', (req, res) => {
+  console.log(req.body);
+  if (req.body.ShoppingListId) {
+    let updates = '';
+    if (req.body.ShoppingListName) {
+      updates = updates.concat(
+        ` ShoppingListName = "${req.body.ShoppingListName}",`
+      );
+    }
+    if (req.body.StartDate) {
+      updates = updates.concat(` StartDate = "${req.body.StartDate}",`);
+    }
+    if (req.body.EndDate) {
+      updates = updates.concat(` EndDate = "${req.body.EndDate}",`);
+    }
+    if (updates === '') {
+      res.sendStatus(400);
+    } else {
+      const newUpdates = updates.slice(0, updates.length - 1);
+      let sql = `update ShoppingLists
+      set ${newUpdates}
+      where ShoppingListId = ${req.body.ShoppingListId};`;
+      handleQuery(sql, res);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
 // listcontents
+
+app.patch('/listcontent', (req, res) => {
+  console.log(req.body);
+  if (req.body.ShoppingListId && req.body.IngredientId) {
+    let updates = '';
+    if (req.body.IngredientName) {
+      updates = updates.concat(
+        ` IngredientName = "${req.body.IngredientName}",`
+      );
+    }
+    if (req.body.Quantity) {
+      updates = updates.concat(` Quantity = ${req.body.Quantity},`);
+    }
+    if (req.body.QuantityAvailable) {
+      updates = updates.concat(
+        ` QuantityAvailable = ${req.body.QuantityAvailable},`
+      );
+    }
+    if (req.body.Picked) {
+      updates = updates.concat(` Picked = ${req.body.Picked},`);
+    }
+    if (updates === '') {
+      res.sendStatus(400);
+    } else {
+      const newUpdates = updates.slice(0, updates.length - 1);
+      let sql = `update ShoppingLists
+      set ${newUpdates}
+      where ShoppingListId = ${req.body.ShoppingListId} 
+      and IngredientId = ${req.body.IngredientId};`;
+      handleQuery(sql, res);
+    }
+  } else {
+    res.sendStatus(400);
+  }
+});
 
 app.listen('3000', () => {
   console.log('Server running, listening on port 3000');
