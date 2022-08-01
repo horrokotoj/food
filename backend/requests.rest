@@ -1,0 +1,20 @@
+GET http://localhost:3000/recipes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwiaWF0IjoxNjU5Mzg2Nzg2fQ.2ab44nyS-_PIbZl6uBGRDrWM7PRGej4g8oHvyd8Wlno
+
+###
+
+GET http://localhost:3000/ingredients/
+
+###
+
+POST http://localhost:4000/login/
+Content-Type: application/json
+
+{
+    "username": "Leo"
+}
+
+###
+
+GET http://localhost:4000/testtoken/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwiaWF0IjoxNjU5Mzg2MTQ3fQ.PFZ1lXjBBXwcBf0vwSkXkD6215X9hj1kLyl1Nv7myjw

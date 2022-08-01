@@ -1,5 +1,15 @@
+const authenticate = require('./components/authenticate.js');
+
+require('dotenv').config();
+
 const express = require('express');
 const mysql = require('mysql2');
+
+const app = express();
+
+const jwt = require('jsonwebtoken');
+
+app.use(express.json());
 
 function handleErrorResponse(err) {
   if (err.code === 'ER_DUP_ENTRY') {
@@ -64,15 +74,12 @@ db.connect((err) => {
   console.log('Connected to db');
 });
 
-const app = express();
-
-app.use(express.json());
-
 // get requests
 
 //recipes
 
-app.get('/recipes', (req, res) => {
+app.get('/recipes', authenticate.authenticateToken, (req, res) => {
+  console.log(req.user);
   let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
   from Recipes
   left join Users on Recipes.RecipeOwner = Users.UserId`;
