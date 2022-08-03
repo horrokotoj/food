@@ -13,7 +13,8 @@ CREATE TABLE Users
 (
 	UserId SERIAL PRIMARY KEY,
 	UserName CHAR(50) NOT NULL,
-    Pass CHAR(50) NOT NULL
+    Pass CHAR(50) NOT NULL,
+    Token CHAR(255)
 );
 
 CREATE TABLE Recipes
