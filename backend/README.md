@@ -10,8 +10,14 @@ Requires npm version 8.5.5
 
 `nvm use --lts`
 
-`npm install express mysql`
+`npm install express bcrypt dotenv express jsonwebtoken mysql2 `
 
-## To run
+## To run server
+
+### For app
 
 `nodemon`
+
+### For authorization server
+
+`nodemon AppAuth.js`
