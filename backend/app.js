@@ -9,6 +9,8 @@ const app = express();
 
 const jwt = require('jsonwebtoken');
 
+const port = process.env.APP_PORT || 4000;
+
 app.use(express.json());
 
 function handleErrorResponse(err) {
@@ -75,6 +77,14 @@ db.connect((err) => {
 });
 
 // get requests
+
+//users
+
+app.get('/users', authenticate.authenticateToken, (req, res) => {
+  console.log(req.user);
+  let sql = `select UserName from Users;`;
+  handleQuery(sql, res);
+});
 
 //recipes
 
@@ -675,6 +685,6 @@ app.patch('/listcontent', (req, res) => {
   }
 });
 
-app.listen('3000', () => {
-  console.log('Server running, listening on port 3000');
+app.listen(port, () => {
+  console.log(`Server running, listening on port ${port}`);
 });

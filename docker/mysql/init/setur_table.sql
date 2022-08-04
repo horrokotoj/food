@@ -1,11 +1,13 @@
 USE food_dev;
 
+DROP TABLE IF EXISTS TickedSteps;
 DROP TABLE IF EXISTS ListContents;
 DROP TABLE IF EXISTS ShoppingLists;
 DROP TABLE IF EXISTS RecipeCalendar;
 DROP TABLE IF EXISTS RecipeIngredients;
 DROP TABLE IF EXISTS Ingredients;
 DROP TABLE IF EXISTS Measurements;
+DROP TABLE IF EXISTS Steps;
 DROP TABLE IF EXISTS Recipes;
 DROP TABLE IF EXISTS Users;
 
@@ -13,7 +15,8 @@ CREATE TABLE Users
 (
 	UserId SERIAL PRIMARY KEY,
 	UserName CHAR(50) NOT NULL,
-    Pass CHAR(50) NOT NULL,
+    UNIQUE (UserName),
+    Pass CHAR(255) NOT NULL,
     Token CHAR(255)
 );
 
@@ -23,12 +26,19 @@ CREATE TABLE Recipes
 	RecipeName CHAR(255) NOT NULL,
     UNIQUE (RecipeName),
     RecipeDesc CHAR(255),
-    RecipeSteps CHAR(255),
     RecipeImage CHAR(255),
     RecipePortions FLOAT NOT NULL,
     RecipeOwner BIGINT UNSIGNED NOT NULL,
     FOREIGN KEY (RecipeOwner) REFERENCES Users (UserId),
     RegisterDate DATE NOT NULL
+);
+
+CREATE TABLE Steps
+(
+    StepId SERIAL PRIMARY KEY,
+    RecipeId BIGINT UNSIGNED NOT NULL,
+    FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId),
+    StepDesc CHAR(255) 
 );
 
 CREATE TABLE Measurements
@@ -84,7 +94,7 @@ CREATE TABLE ListContents
 (
     ShoppingListId BIGINT UNSIGNED NOT NULL,
     IngredientId BIGINT UNSIGNED NOT NULL,
-    CONSTRAINT PK_RecipeIngredients PRIMARY KEY
+    CONSTRAINT PK_ListContents PRIMARY KEY
 	(
 			ShoppingListId,
 			IngredientId
@@ -95,6 +105,19 @@ CREATE TABLE ListContents
     Quantity FLOAT NOT NULL,
     QuantityAvailable FLOAT,
     Picked BOOLEAN NOT NULL
+);
+
+CREATE TABLE TickedSteps
+(
+    RecipeCalendarId BIGINT UNSIGNED NOT NULL,
+    StepId BIGINT UNSIGNED NOT NULL,
+    CONSTRAINT PK_TickedSteps PRIMARY KEY
+	(
+			RecipeCalendarId,
+			StepId
+	),
+    FOREIGN KEY (RecipeCalendarId) REFERENCES RecipeCalendar (RecipeCalendarId),
+    FOREIGN KEY (StepId) REFERENCES Steps (StepId)
 );
 
 INSERT INTO Users (UserName, Pass)

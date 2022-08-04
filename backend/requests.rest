@@ -11,8 +11,14 @@ POST http://localhost:4000/login/
 Content-Type: application/json
 
 {
-    "username": "Leo"
+    "username": "Test",
+    "password": "Test"
 }
+
+###
+
+post http://localhost:4000/logout/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiVGVzdCIsImlhdCI6MTY1OTY0MzkxMiwiZXhwIjoxNjU5NjQ0ODEyfQ.16niVzC0BYABAU77V0caOlHEh3GxImZwwZXDnvRGXIs
 
 ###
 
@@ -27,3 +33,18 @@ Content-Type: application/json
 
 GET http://localhost:4000/testtoken/
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwiaWF0IjoxNjU5NTI3MTgyLCJleHAiOjE2NTk1MjcxOTd9.9sqqTYKnn01fzf60TrSs_9qAUHSDjDmr_OYTeylnm5I
+
+###
+
+get http://localhost:3000/users/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwiaWF0IjoxNjU5NjMyMTMwLCJleHAiOjE2NTk2MzMwMzB9.kEa2D357LeaPKPg3V3IfLEj0y1k6gs8k1NTg5zLrww4
+
+###
+
+post http://localhost:4000/user/
+Content-Type: application/json
+
+{
+    "username": "Test",
+    "password": "Test"
+}

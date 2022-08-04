@@ -3,10 +3,12 @@ const authenticate = require('./components/authenticate.js');
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
-const jwt = require('jsonwebtoken');
+const port = process.env.APPAUTH_PORT || 4000;
 
 app.use(express.json());
 
@@ -30,36 +32,128 @@ db.connect((err) => {
   console.log('Connected to db');
 });
 
-app.post('/login', (req, res) => {
-  console.log(req.body);
-  if (req.body.username) {
+app.post('/user', (req, res) => {
+  if (req.body.username && req.body.password) {
     const username = req.body.username;
-    const user = { user: username };
-    const accessToken = generateAccessToken(user);
-    const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);
-    console.log(refreshToken.length);
-    let sql = `update Users
-      set Token = "${refreshToken}"
-      where UserName = "${username}";`;
-
-    db.query(sql, (err, rows) => {
+    let sql = `select UserName from Users where
+    UserName = "${username}";`;
+    db.query(sql, async (err, rows) => {
       if (err) {
         console.log(err);
         res.sendStatus(500);
       } else {
         console.log(rows);
-        console.log(rows.affectedRows);
-        if (rows.affectedRows === 1) {
-          res.json({ accessToken: accessToken, refreshToken: refreshToken });
+        if (rows.length > 0) {
+          res.sendStatus(409);
         } else {
-          res.sendStatus(404);
+          try {
+            const hashedPassword = await bcrypt.hash(req.body.password, 10);
+            let sql = `insert into Users (UserName, Pass)
+              values ("${username}", "${hashedPassword}");`;
+            db.query(sql, (err, rows) => {
+              if (err) {
+                console.log(err);
+                res.sendStatus(500);
+              } else {
+                console.log(rows);
+                console.log(rows.affectedRows);
+                if (rows.affectedRows === 1) {
+                  res.sendStatus(200);
+                } else {
+                  res.sendStatus(500);
+                }
+              }
+            });
+          } catch (err) {
+            console.log(err);
+          }
         }
       }
     });
   } else {
-    res.status(400).json({ error: 'Username is required' });
+    res.sendStatus(400);
+  }
+});
+
+app.post('/login', (req, res) => {
+  console.log(req.body);
+  if (req.body.username && req.body.password) {
+    const username = req.body.username;
+    const password = req.body.password;
+    let sql1 = `select Pass from Users
+      where UserName = "${username}";`;
+    db.query(sql1, async (err, rows) => {
+      if (err) {
+        res.sendStatus(500);
+      } else {
+        if (rows.length === 1) {
+          const hashedPassword = rows[0].Pass;
+          try {
+            if (await bcrypt.compare(password, hashedPassword)) {
+              const user = { user: username };
+              const accessToken = generateAccessToken(user);
+              const refreshToken = jwt.sign(
+                user,
+                process.env.REFRESH_TOKEN_SECRET
+              );
+              console.log(refreshToken.length);
+              let sql2 = `update Users
+                set Token = "${refreshToken}"
+                where UserName = "${username}";`;
+
+              db.query(sql2, (err, rows) => {
+                if (err) {
+                  console.log(err);
+                  res.sendStatus(500);
+                } else {
+                  console.log(rows);
+                  console.log(rows.affectedRows);
+                  if (rows.affectedRows === 1) {
+                    res.json({
+                      accessToken: accessToken,
+                      refreshToken: refreshToken,
+                    });
+                  } else {
+                    res.sendStatus(404);
+                  }
+                }
+              });
+            } else {
+              res.sendStatus(400);
+            }
+          } catch (err) {
+            console.log(err);
+            res.sendStatus(500);
+          }
+        } else {
+          res.sendStatus(400);
+        }
+      }
+    });
+  } else {
+    res.status(400);
     return;
   }
+});
+
+app.post('/logout', authenticate.authenticateToken, (req, res) => {
+  const username = req.user.user;
+  let sql = `update Users 
+    set Token = NULL
+    where UserName = "${username}";`;
+  db.query(sql, (err, rows) => {
+    if (err) {
+      res.sendStatus(500);
+    } else {
+      console.log('Rows after logout query');
+      console.log(rows);
+      if (rows.affectedRows === 1) {
+        res.sendStatus(200);
+      } else {
+        res.sendStatus(500);
+      }
+    }
+  });
 });
 
 app.post('/token', (req, res) => {
@@ -95,6 +189,6 @@ app.get('/testtoken', authenticate.authenticateToken, (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen('4000', () => {
-  console.log('Server running, listening on port 4000');
+app.listen(port, () => {
+  console.log(`Server running, listening on port ${port}`);
 });
