@@ -10,7 +10,7 @@ Requires npm version 8.5.5
 
 `nvm use --lts`
 
-`npm install express bcrypt dotenv express jsonwebtoken mysql2 `
+`npm install --save express bcrypt dotenv express jsonwebtoken mysql2 `
 
 ## To run server
 
