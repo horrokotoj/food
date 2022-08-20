@@ -96,7 +96,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
   handleQuery(sql, res);
 });
 
-app.get('/recipe/:id', (req, res) => {
+app.get('/recipe/:id', authenticate.authenticateToken, (req, res) => {
   let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
     from Recipes
     left join Users on Recipes.RecipeOwner = Users.UserId
@@ -106,14 +106,14 @@ app.get('/recipe/:id', (req, res) => {
 
 // ingredients
 
-app.get('/ingredients', (req, res) => {
+app.get('/ingredients', authenticate.authenticateToken, (req, res) => {
   let sql = `select Ingredients.IngredientId, Ingredients.IngredientName, Measurements.MeasurementName as Measurement 
   from Ingredients
   left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId`;
   handleQuery(sql, res);
 });
 
-app.get('/ingredient/:id', (req, res) => {
+app.get('/ingredient/:id', authenticate.authenticateToken, (req, res) => {
   let sql = `select Ingredients.IngredientId, Ingredients.IngredientName, Measurements.MeasurementName as Measurement
   from Ingredients
   left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId
@@ -123,7 +123,7 @@ app.get('/ingredient/:id', (req, res) => {
 
 //recipeingredients
 
-app.get('/recipeingredient/:id', (req, res) => {
+app.get('/recipeingredient/:id', authenticate.authenticateToken, (req, res) => {
   let sql = `select IngredientName, Quantity, MeasurementName 
   from RecipeIngredients 
   left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
@@ -134,25 +134,30 @@ app.get('/recipeingredient/:id', (req, res) => {
 
 // measurements
 
-app.get('/measurements', (req, res) => {
+app.get('/measurements', authenticate.authenticateToken, (req, res) => {
   let sql = 'select * from Measurements';
   handleQuery(sql, res);
 });
 
 // recipecalendar
 
-app.get('/recipecalendar', (req, res) => {
+app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
   let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar`;
   handleQuery(sql, res);
 });
 
-app.get('/recipecalendar/:year/:month/:day', (req, res) => {
-  let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
-  handleQuery(sql, res);
-});
+app.get(
+  '/recipecalendar/:year/:month/:day',
+  authenticate.authenticateToken,
+  (req, res) => {
+    let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
+    handleQuery(sql, res);
+  }
+);
 
 app.get(
   '/recipecalendar/intervall/:yearstart/:monthstart/:daystart/:yearstop/:monthstop/:daystop',
+  authenticate.authenticateToken,
   (req, res) => {
     let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate between "${req.params.yearstart}-${req.params.monthstart}-${req.params.daystart}" and "${req.params.yearstop}-${req.params.monthstop}-${req.params.daystop}"`;
     handleQuery(sql, res);
@@ -161,13 +166,14 @@ app.get(
 
 // shoppinglists
 
-app.get('/shoppinglists', (req, res) => {
+app.get('/shoppinglists', authenticate.authenticateToken, (req, res) => {
   let sql = 'select * from ShoppingLists';
   handleQuery(sql, res);
 });
 
 app.get(
   '/shoppinglist/intervall/:yearstart/:monthstart/:daystart/:yearstop/:monthstop/:daystop',
+  authenticate.authenticateToken,
   (req, res) => {
     let sql = `select Ingredients.IngredientName, sum((RecipeCalendar.Portions/Recipes.RecipePortions)*RecipeIngredients.Quantity) as FinalQuantity from RecipeCalendar
   left join Recipes
@@ -185,12 +191,12 @@ app.get(
 
 // listcontents
 
-app.get('/listcontents', (req, res) => {
+app.get('/listcontents', authenticate.authenticateToken, (req, res) => {
   let sql = `select * from ListContents;`;
   handleQuery(sql, res);
 });
 
-app.get('/listcontent/:id', (req, res) => {
+app.get('/listcontent/:id', authenticate.authenticateToken, (req, res) => {
   let sql = `select * from ListContents
     where ShoppingListId = ${req.params.id};`;
   handleQuery(sql, res);
@@ -200,7 +206,7 @@ app.get('/listcontent/:id', (req, res) => {
 
 // recipes
 
-app.post('/recipe', (req, res) => {
+app.post('/recipe', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql = `insert into Recipes (RecipeName, 
     RecipeDesc, 
@@ -221,7 +227,7 @@ app.post('/recipe', (req, res) => {
 
 // ingredients
 
-app.post('/ingredient', (req, res) => {
+app.post('/ingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql = `insert into Ingredients (IngredientName, 
     MeasurementId)
@@ -234,7 +240,7 @@ app.post('/ingredient', (req, res) => {
 
 // recipeingredients
 
-app.post('/recipeingredient', (req, res) => {
+app.post('/recipeingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql = `insert into RecipeIngredients (RecipeId, IngredientId, Quantity)
   values 
@@ -247,7 +253,7 @@ app.post('/recipeingredient', (req, res) => {
 
 // measurements
 
-app.post('/measurement', (req, res) => {
+app.post('/measurement', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql = `insert into Measurements (MeasurementName)
   values 
@@ -258,7 +264,7 @@ app.post('/measurement', (req, res) => {
 
 // recipecalendar
 
-app.post('/recipecalendar', (req, res) => {
+app.post('/recipecalendar', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql = `insert into RecipeCalendar (RecipeDate, RecipeId, Portions)
   values 
@@ -271,7 +277,7 @@ app.post('/recipecalendar', (req, res) => {
 
 // shoppinglists
 
-app.post('/shoppinglist', (req, res) => {
+app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql;
   if (req.body.ShoppingListName) {
@@ -299,7 +305,7 @@ app.post('/shoppinglist', (req, res) => {
 
 // listcontents
 
-app.post('/listcontent', (req, res) => {
+app.post('/listcontent', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   let sql;
   if (req.body.ShoppingListId && req.body.IngredientId && req.body.Quantity) {
@@ -332,10 +338,13 @@ app.post('/listcontent', (req, res) => {
   }
 });
 
-app.post('/listcontents/intervall', (req, res) => {
-  console.log(req.body);
-  if (req.body.ShoppingListId) {
-    let sql = `insert into ListContents (ShoppingListId, IngredientId, Ingredientname, Quantity, Picked)
+app.post(
+  '/listcontents/intervall',
+  authenticate.authenticateToken,
+  (req, res) => {
+    console.log(req.body);
+    if (req.body.ShoppingListId) {
+      let sql = `insert into ListContents (ShoppingListId, IngredientId, Ingredientname, Quantity, Picked)
     select ${req.body.ShoppingListId}, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.Portions/Recipes.RecipePortions)*RecipeIngredients.Quantity) 
     as Quantity, false from RecipeCalendar
     left join Recipes
@@ -350,17 +359,18 @@ app.post('/listcontents/intervall', (req, res) => {
     (select EndDate from ShoppingLists where ShoppingListId = ${req.body.ShoppingListId})
     group by IngredientId;`;
 
-    handleQuery(sql, res);
-  } else {
-    res.sendStatus(400);
+      handleQuery(sql, res);
+    } else {
+      res.sendStatus(400);
+    }
   }
-});
+);
 
 // delete requests
 
 // recipes
 
-app.delete('/recipe', (req, res) => {
+app.delete('/recipe', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeId) {
     let sql1 = `delete from RecipeIngredients where RecipeId = ${req.body.RecipeId};`;
@@ -375,7 +385,7 @@ app.delete('/recipe', (req, res) => {
 
 // ingredients
 
-app.delete('/ingredient', (req, res) => {
+app.delete('/ingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.IngredientId) {
     let sql1 = `delete from RecipeIngredients where IngredientId = ${req.body.IngredientId};`;
@@ -390,7 +400,7 @@ app.delete('/ingredient', (req, res) => {
 
 // recipeingredients
 
-app.delete('/recipeingredient', (req, res) => {
+app.delete('/recipeingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeId && req.body.IngredientId) {
     let sql = `delete from 
@@ -407,7 +417,7 @@ app.delete('/recipeingredient', (req, res) => {
 
 // measurements
 
-app.delete('/measurement', (req, res) => {
+app.delete('/measurement', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.MeasurementId) {
     let sql1 = `delete from RecipeIngredients where IngredientId in (select IngredientId from Ingredients where MeasurementId = ${req.body.MeasurementId});`;
@@ -425,7 +435,7 @@ app.delete('/measurement', (req, res) => {
 
 // recipecalendar
 
-app.delete('/recipecalendar', (req, res) => {
+app.delete('/recipecalendar', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeCalendarId) {
     let sql = `delete from RecipeCalendar 
@@ -440,20 +450,24 @@ app.delete('/recipecalendar', (req, res) => {
   }
 });
 
-app.delete('/recipecalendar/intervall', (req, res) => {
-  console.log(req.body);
-  if (req.body.StartDate && req.body.EndDate) {
-    let sql = `delete from RecipeCalendar 
+app.delete(
+  '/recipecalendar/intervall',
+  authenticate.authenticateToken,
+  (req, res) => {
+    console.log(req.body);
+    if (req.body.StartDate && req.body.EndDate) {
+      let sql = `delete from RecipeCalendar 
       where RecipeDate between "${req.body.StartDate}" and "${req.body.EndDate}";`;
-    handleQuery(sql, res);
-  } else {
-    res.sendStatus(400);
+      handleQuery(sql, res);
+    } else {
+      res.sendStatus(400);
+    }
   }
-});
+);
 
 // shoppinglists
 
-app.delete('/shoppinglist', (req, res) => {
+app.delete('/shoppinglist', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.ShoppingListId) {
     let sql1 = `delete from ListContents where ShoppingListId = ${req.body.ShoppingListId};`;
@@ -476,7 +490,7 @@ app.delete('/shoppinglist', (req, res) => {
 
 // listcontents
 
-app.delete('/listcontent', (req, res) => {
+app.delete('/listcontent', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.ShoppingListId && req.body.IngredientId) {
     let sql = `delete from ListContents 
@@ -492,7 +506,7 @@ app.delete('/listcontent', (req, res) => {
 
 // recipes
 
-app.patch('/recipe', (req, res) => {
+app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeId) {
     let updates = '';
@@ -533,7 +547,7 @@ app.patch('/recipe', (req, res) => {
 
 // ingredients
 
-app.patch('/ingredient', (req, res) => {
+app.patch('/ingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.IngredientId) {
     let updates = '';
@@ -561,7 +575,7 @@ app.patch('/ingredient', (req, res) => {
 
 // recipeingredients
 
-app.patch('/recipeingredient', (req, res) => {
+app.patch('/recipeingredient', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeId && req.body.IngredientId && req.body.Quantity) {
     let sql = `update RecipeIngredients
@@ -576,7 +590,7 @@ app.patch('/recipeingredient', (req, res) => {
 
 // measurements
 
-app.patch('/measurement', (req, res) => {
+app.patch('/measurement', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.MeasurementId && req.body.MeasurementName) {
     let sql = `update Measurements
@@ -590,7 +604,7 @@ app.patch('/measurement', (req, res) => {
 
 // recipecalendar
 
-app.patch('/recipecalendar', (req, res) => {
+app.patch('/recipecalendar', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeCalendarId) {
     let updates = '';
@@ -619,7 +633,7 @@ app.patch('/recipecalendar', (req, res) => {
 
 // shoppinglists
 
-app.patch('/shoppinglist', (req, res) => {
+app.patch('/shoppinglist', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.ShoppingListId) {
     let updates = '';
@@ -650,7 +664,7 @@ app.patch('/shoppinglist', (req, res) => {
 
 // listcontents
 
-app.patch('/listcontent', (req, res) => {
+app.patch('/listcontent', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.ShoppingListId && req.body.IngredientId) {
     let updates = '';
@@ -658,6 +672,9 @@ app.patch('/listcontent', (req, res) => {
       updates = updates.concat(
         ` IngredientName = "${req.body.IngredientName}",`
       );
+    }
+    if (req.body.Order) {
+      updates = updates.concat(` Order = ${req.body.Order},`);
     }
     if (req.body.Quantity) {
       updates = updates.concat(` Quantity = ${req.body.Quantity},`);
@@ -680,6 +697,28 @@ app.patch('/listcontent', (req, res) => {
       and IngredientId = ${req.body.IngredientId};`;
       handleQuery(sql, res);
     }
+  } else {
+    res.sendStatus(400);
+  }
+});
+
+app.patch('/listcontent/order', authenticate.authenticateToken, (req, res) => {
+  if (req.body.ShoppingListId && req.body.IngredientId && req.body.Order) {
+    for (let i = 0; i < req.body.IngredientId.length(); i++) {
+      let sql = `update ListContents 
+      set Order = ${req.body.Order[i]}
+      where ShoppingListId = ${req.body.ShoppingListId}
+      and IngredientId = ${req.body.IngredientId[i]};`;
+      db.query(sql, (err, rows) => {
+        if (err) {
+          console.log(err);
+          res.sendStatus(handleErrorResponse(err));
+        } else {
+          console.log(rows);
+        }
+      });
+    }
+    res.sendStatus(200);
   } else {
     res.sendStatus(400);
   }

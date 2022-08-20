@@ -119,14 +119,14 @@ app.post('/login', (req, res) => {
                 }
               });
             } else {
-              res.sendStatus(400);
+              res.sendStatus(401);
             }
           } catch (err) {
             console.log(err);
             res.sendStatus(500);
           }
         } else {
-          res.sendStatus(400);
+          res.sendStatus(401);
         }
       }
     });
@@ -168,6 +168,7 @@ app.post('/token', (req, res) => {
         res.sendStatus(500);
       } else {
         if (rows.length === 0) {
+          console.log(rows);
           res.sendStatus(404);
         } else if (rows.length === 1) {
           const user = { user: rows[0].UserName };

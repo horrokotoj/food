@@ -1,5 +1,7 @@
 USE food_dev;
 
+DROP TABLE IF EXISTS RecipeTags;
+DROP TABLE IF EXISTS Tags;
 DROP TABLE IF EXISTS TickedSteps;
 DROP TABLE IF EXISTS ListContents;
 DROP TABLE IF EXISTS ShoppingLists;
@@ -101,6 +103,7 @@ CREATE TABLE ListContents
 	),
     FOREIGN KEY (ShoppingListId) REFERENCES ShoppingLists (ShoppingListId),
     FOREIGN KEY (IngredientId) REFERENCES Ingredients (IngredientId),
+    Indexx BIGINT UNSIGNED,
     IngredientName CHAR(255) NOT NULL, 
     Quantity FLOAT NOT NULL,
     QuantityAvailable FLOAT,
@@ -120,10 +123,30 @@ CREATE TABLE TickedSteps
     FOREIGN KEY (StepId) REFERENCES Steps (StepId)
 );
 
+CREATE TABLE Tags
+(
+	TagId SERIAL PRIMARY KEY,
+	TagtName CHAR(255) NOT NULL,
+    UNIQUE (TagtName)
+);
+
+CREATE TABLE RecipeTags
+(
+    RecipeId BIGINT UNSIGNED NOT NULL,
+    TagId BIGINT UNSIGNED NOT NULL,
+    CONSTRAINT PK_RecipeTags PRIMARY KEY
+	(
+			RecipeId,
+			TagId
+	),
+    FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId),
+    FOREIGN KEY (TagId) REFERENCES Tags (TagId)
+);
+
 INSERT INTO Users (UserName, Pass)
 VALUES
-	('Leo', "password"),
-	('Erica', "password");
+	('leo', "$2b$10$SADX3ogGrgimo28TrYa8teUg/JvzlwemPIGD/JAuiXQtb5uHUjC4m"),
+	('erica', "password");
 
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
