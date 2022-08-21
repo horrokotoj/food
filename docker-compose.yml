@@ -1,15 +1,15 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  db: 
+  db:
     image: horrokotoj/food-mysql
     ports:
       - 3306:3306
     container_name: food-mysql
     restart: unless-stopped
     volumes:
-      - "mysql-data:/var/lib/mysql/:delegated"
-      - "./docker/mysql/init:/docker-entrypoint-initdb.d"
+      - 'mysql-data:/var/lib/mysql/:delegated'
+      - './docker/mysql/init:/docker-entrypoint-initdb.d'
     environment:
       - MYSQL_ROOT_PASSWORD=yRpEH7JM74dtaT
 
@@ -18,7 +18,7 @@ services:
     container_name: food-adminer
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"
+      - '127.0.0.1:8080:8080'
 
 volumes:
   mysql-data:

@@ -14,6 +14,24 @@ Requires npm version 8.5.5
 
 ## To run server
 
+### Environment
+
+A .env file which contains
+
+`APP_PORT`
+
+`APPAUTH_PORT`
+
+`ACCESS_TOKEN_SECRET`
+
+`REFRESH_TOKEN_SECRET`
+
+Generate a token with:
+
+`node`
+
+`require('crypto').randomBytes(64).toString('hex')`
+
 ### For app
 
 `nodemon`

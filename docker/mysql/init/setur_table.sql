@@ -145,7 +145,7 @@ CREATE TABLE RecipeTags
 
 INSERT INTO Users (UserName, Pass)
 VALUES
-	('leo', "$2b$10$SADX3ogGrgimo28TrYa8teUg/JvzlwemPIGD/JAuiXQtb5uHUjC4m"),
+	('leo', "password"),
 	('erica', "password");
 
 INSERT INTO Recipes (RecipeName,
@@ -155,7 +155,7 @@ INSERT INTO Recipes (RecipeName,
     RecipeOwner,
     RegisterDate)
 VALUES
-	('Köttfärsås', "Gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.5UrFhKHsjCzErhgaCjaZ8wHaFj%26pid%3DApi&f=1", 4.0, 1, "2022-07-12"),
+	('Köttfärssås', "Gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.5UrFhKHsjCzErhgaCjaZ8wHaFj%26pid%3DApi&f=1", 4.0, 1, "2022-07-12"),
 	('Kräftpasta', "Mycket gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse2.mm.bing.net%2Fth%3Fid%3DOIP.z9agqeFaNLoFxZUIV5QvCAHaE8%26pid%3DApi&f=1", 4.0, 2, "2022-07-13");
 
 INSERT INTO Measurements (MeasurementName)
