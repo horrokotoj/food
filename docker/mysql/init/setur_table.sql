@@ -38,6 +38,7 @@ CREATE TABLE Recipes
 CREATE TABLE Steps
 (
     StepId SERIAL PRIMARY KEY,
+    Step BIGINT UNSIGNED NOT NULL,
     RecipeId BIGINT UNSIGNED NOT NULL,
     FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId),
     StepDesc CHAR(255) 
@@ -199,6 +200,12 @@ VALUES
     (2, 13, 200),
     (2, 14, 5),
     (2, 15, 0.5);
+
+INSERT INTO Steps (Step, RecipeId, StepDesc)
+VALUES
+    (1, 1, "Ta fram alla ingredienser"),
+    (2, 1, "Laga maten"),
+    (3, 1, "Servera maten");
 
 INSERT INTO RecipeCalendar (RecipeDate, RecipeId, Portions)
 VALUES
