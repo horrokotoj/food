@@ -11,8 +11,8 @@ POST http://localhost:4000/login/
 Content-Type: application/json
 
 {
-    "username": "Test",
-    "password": "Test"
+    "username": "test",
+    "password": "test"
 }
 
 ###
@@ -41,10 +41,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwia
 
 ###
 
-post http://localhost:4000/user/
+post http://localhost:4000/login/
 Content-Type: application/json
 
 {
-    "username": "Test",
-    "password": "Test"
+    "username": "test",
+    "password": "test"
+}
+
+###
+
+patch http://localhost:3000/recipe/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTGVvIiwiaWF0IjoxNjU5NTI3MTgyLCJleHAiOjE2NTk1MjcxOTd9.9sqqTYKnn01fzf60TrSs_9qAUHSDjDmr_OYTeylnm5I
+Content-Type: application/json
+
+{
+    "RecipeId": 1,
+    "RecipeOwner": "test"
 }

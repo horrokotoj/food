@@ -124,7 +124,7 @@ app.get('/ingredient/:id', authenticate.authenticateToken, (req, res) => {
 //recipeingredients
 
 app.get('/recipeingredient/:id', authenticate.authenticateToken, (req, res) => {
-  let sql = `select IngredientName, Quantity, MeasurementName 
+  let sql = `select Ingredients.IngredientId, IngredientName, Quantity, MeasurementName 
   from RecipeIngredients 
   left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
   left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId 
@@ -382,11 +382,18 @@ app.post(
 app.delete('/recipe', authenticate.authenticateToken, (req, res) => {
   console.log(req.body);
   if (req.body.RecipeId) {
-    let sql1 = `delete from RecipeIngredients where RecipeId = ${req.body.RecipeId};`;
+    if (req.body.value) {
+      let sql = `update Recipes
+        set ${req.body.value} = ''
+        where RecipeId = ${req.body.RecipeId}`;
+      handleQuery(sql, res);
+    } else {
+      let sql1 = `delete from RecipeIngredients where RecipeId = ${req.body.RecipeId};`;
 
-    let sql2 = `delete from Recipes where RecipeId = ${req.body.RecipeId};`;
+      let sql2 = `delete from Recipes where RecipeId = ${req.body.RecipeId};`;
 
-    handleMultiQuery([sql1, sql2], res);
+      handleMultiQuery([sql1, sql2], res);
+    }
   } else {
     res.sendStatus(400);
   }
@@ -516,13 +523,13 @@ app.delete('/listcontent', authenticate.authenticateToken, (req, res) => {
 // recipes
 
 app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
-  console.log(req.body);
   if (req.body.RecipeId) {
     let updates = '';
     if (req.body.RecipeName) {
       updates = updates.concat(` RecipeName = "${req.body.RecipeName}",`);
     }
     if (req.body.RecipeDesc) {
+      console.log('here');
       updates = updates.concat(` RecipeDesc = "${req.body.RecipeDesc}",`);
     }
     if (req.body.RecipeSteps) {
@@ -540,13 +547,15 @@ app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
     if (req.body.RegisterDate) {
       updates = updates.concat(` RegisterDate = "${req.body.RegisterDate}",`);
     }
+    console.log(updates);
     if (updates === '') {
       res.sendStatus(400);
     } else {
       const newUpdates = updates.slice(0, updates.length - 1);
       let sql = `update Recipes
-      set ${newUpdates}
-      where RecipeId = ${req.body.RecipeId};`;
+        set ${newUpdates}
+        where RecipeId = ${req.body.RecipeId};`;
+      console.log(sql);
       handleQuery(sql, res);
     }
   } else {
