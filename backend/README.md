@@ -38,4 +38,4 @@ Generate a token with:
 
 ### For authorization server
 
-`nodemon AppAuth.js`
+`nodemon appAuth.js`
