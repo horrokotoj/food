@@ -234,6 +234,82 @@ app.post('/recipe', authenticate.authenticateToken, (req, res) => {
 	handleQuery(sql, res);
 });
 
+app.post('/entirerecipe', authenticate.authenticateToken, (req, res) => {
+	console.log(req.user);
+	let sql = `select UserId from Users where UserName = "${req.user.user}";`;
+	let UserId = null;
+	let RecipeId = null;
+	let sqlArray = [];
+	let partialResult;
+	db.query(sql, (err, rows) => {
+		if (err) {
+			console.log(err);
+			res.sendStatus(handleErrorResponse(err));
+		} else {
+			console.log('Finding user done');
+			if (rows.length > 1) {
+				res.sendStatus(409);
+			} else {
+				UserId = rows[0].UserId;
+				if (UserId) {
+					let sql1 = `insert into Recipes (RecipeName, 
+						RecipeDesc, 
+						RecipeImage, 
+						RecipePortions, 
+						RecipeOwner, 
+						RegisterDate)
+					values 
+						("${req.body.RecipeName}", 
+						"${req.body.RecipeDesc}",
+						"${req.body.RecipeImage}", 
+						${req.body.RecipePortions}, 
+						${UserId},
+						curdate());`;
+					db.query(sql1, (err, rows) => {
+						if (err) {
+							console.log(err);
+							res.sendStatus(handleErrorResponse(err));
+						} else {
+							partialResult = rows;
+							RecipeId = rows.insertId;
+							if (RecipeId) {
+								for (let i = 0; i < req.body.RecipeIngredients.length; i++) {
+									sql = `insert into RecipeIngredients (RecipeId, IngredientId, Quantity)
+										values 
+											(${RecipeId}, 
+											${req.body.RecipeIngredients[i].IngredientId}, 
+											${req.body.RecipeIngredients[i].Quantity});`;
+									sqlArray = sqlArray.concat(sql);
+								}
+								for (let i = 0; i < req.body.RecipeSteps.length; i++) {
+									sql = `insert into Steps (Step, RecipeId, StepDesc)
+										values 
+											(${req.body.RecipeSteps[i].Step}, 
+											${RecipeId}, 
+											"${req.body.RecipeSteps[i].StepDesc}");`;
+									sqlArray = sqlArray.concat(sql);
+								}
+								if (sqlArray.length > 0) {
+									handleMultiQuery(sqlArray, res);
+								} else {
+									res.send(partialResult);
+								}
+							}
+						}
+					});
+				} else {
+					console.log('No UserId');
+					res.sendStatus(400);
+				}
+			}
+		}
+	});
+
+	console.log(UserId);
+	console.log(req.body);
+	//res.sendStatus(400);
+});
+
 // ingredients
 
 app.post('/ingredient', authenticate.authenticateToken, (req, res) => {
