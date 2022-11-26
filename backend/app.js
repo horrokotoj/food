@@ -72,7 +72,7 @@ async function verificationMail({ username, email }, res) {
 	let transporter = nodemailer.createTransport({
 		host: process.env.VER_HOST,
 		port: process.env.VER_PORT,
-		secure: true, // true for 465, false for other ports
+		secure: false, // true for 465, false for other ports
 		auth: {
 			user: process.env.VER_EMAIL, // generated ethereal user
 			pass: process.env.VER_PASS, // generated ethereal password
@@ -80,6 +80,7 @@ async function verificationMail({ username, email }, res) {
 		tls: {
 			rejectUnauthorized: false,
 		},
+
 	});
 
 	let mailOptions = {
