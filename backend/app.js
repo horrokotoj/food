@@ -80,7 +80,6 @@ async function verificationMail({ username, email }, res) {
 		tls: {
 			rejectUnauthorized: false,
 		},
-
 	});
 
 	let mailOptions = {
@@ -103,6 +102,7 @@ async function verificationMail({ username, email }, res) {
 			}
 		})
 	) {
+		console.log('here');
 		res.sendStatus(200);
 	} else {
 		res.sendStatus(500);
