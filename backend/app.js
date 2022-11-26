@@ -67,7 +67,7 @@ function handleMultiQuery(sqlArr, res) {
 }
 
 // nodemailer
-async function verificationMail(object, res) {
+async function verificationMail({ username, email }, res) {
 	// create reusable transporter object using the default SMTP transport
 	let transporter = nodemailer.createTransport({
 		host: process.env.VER_HOST,
@@ -84,7 +84,7 @@ async function verificationMail(object, res) {
 
 	let mailOptions = {
 		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
-		to: object.email, // list of receivers
+		to: email, // list of receivers
 		subject: 'food verification request', // Subject line
 		text: `Hello ${username}`, // plain text body
 		html: '<b>Hello world?</b>', // html body
