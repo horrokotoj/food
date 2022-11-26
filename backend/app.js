@@ -67,7 +67,7 @@ function handleMultiQuery(sqlArr, res) {
 }
 
 // nodemailer
-async function verificationMail({ username, email }, res) {
+async function verificationMail({ username, email }) {
 	// create reusable transporter object using the default SMTP transport
 	let transporter = nodemailer.createTransport({
 		host: process.env.VER_HOST,
@@ -91,22 +91,13 @@ async function verificationMail({ username, email }, res) {
 	};
 
 	// send mail with defined transport object
-	if (
-		await transporter.sendMail(mailOptions, (error, info, res) => {
-			if (error) {
-				console.log(error);
-				return false;
-			} else {
-				console.log(`Message sent: ${info.messageId}`);
-				return true;
-			}
-		})
-	) {
-		console.log('here');
-		res.sendStatus(200);
-	} else {
-		res.sendStatus(500);
-	}
+	await transporter.sendMail(mailOptions, (error, info, res) => {
+		if (error) {
+			console.log(error);
+		} else {
+			console.log(`Message sent: ${info.messageId}`);
+		}
+	});
 }
 
 // Create connection to database
@@ -152,7 +143,8 @@ app.post('/user', (req, res) => {
 								console.log(rows);
 								console.log(rows.affectedRows);
 								if (rows.affectedRows === 1) {
-									verificationMail({ username: username, email: email }, res);
+									verificationMail({ username: username, email: email });
+									res.sendStatus(200);
 								} else {
 									res.sendStatus(500);
 								}
