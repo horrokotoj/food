@@ -67,10 +67,10 @@ function handleMultiQuery(sqlArr, res) {
 
 // Create connection to database
 const db = mysql.createConnection({
-	host: 'localhost',
-	user: 'foodUser',
-	password: 'lU4QI8sX0JaWcH2UrODwc7utFW35w5Yo',
-	database: 'food_db',
+	host: process.env.DB_HOST,
+	user: process.env.DB_USER,
+	password: process.env.DB_PASS,
+	database: process.env.DB,
 });
 
 // Connect to db
