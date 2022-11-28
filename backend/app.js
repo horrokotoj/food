@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const mysql = require('mysql2');
+const nodemailer = require('nodemailer');
 
 const app = express();
 
@@ -65,6 +66,40 @@ function handleMultiQuery(sqlArr, res) {
 	}
 }
 
+// nodemailer
+async function verificationMail({ username, email }) {
+	// create reusable transporter object using the default SMTP transport
+	let transporter = nodemailer.createTransport({
+		host: process.env.VER_HOST,
+		port: process.env.VER_PORT,
+		secure: false, // true for 465, false for other ports
+		auth: {
+			user: process.env.VER_EMAIL, // generated ethereal user
+			pass: process.env.VER_PASS, // generated ethereal password
+		},
+		tls: {
+			rejectUnauthorized: false,
+		},
+	});
+
+	let mailOptions = {
+		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
+		to: email, // list of receivers
+		subject: 'food verification request', // Subject line
+		text: `Hello ${username}`, // plain text body
+		html: '<b>Hello world?</b>', // html body
+	};
+
+	// send mail with defined transport object
+	await transporter.sendMail(mailOptions, (error, info, res) => {
+		if (error) {
+			console.log(error);
+		} else {
+			console.log(`Message sent: ${info.messageId}`);
+		}
+	});
+}
+
 // Create connection to database
 const db = mysql.createConnection({
 	host: process.env.DB_HOST,
@@ -82,8 +117,9 @@ db.connect((err) => {
 });
 
 app.post('/user', (req, res) => {
-	if (req.body.username && req.body.password) {
+	if (req.body.username && req.body.password && req.body.email) {
 		const username = req.body.username;
+		const email = req.body.email;
 		let sql = `select UserName from Users where
     UserName = "${username}";`;
 		db.query(sql, async (err, rows) => {
@@ -97,8 +133,8 @@ app.post('/user', (req, res) => {
 				} else {
 					try {
 						const hashedPassword = await bcrypt.hash(req.body.password, 10);
-						let sql = `insert into Users (UserName, Pass)
-              values ("${username}", "${hashedPassword}");`;
+						let sql = `insert into Users (UserName, Pass, UserEmail)
+              values ("${username}", "${hashedPassword}", "${email}");`;
 						db.query(sql, (err, rows) => {
 							if (err) {
 								console.log(err);
@@ -107,6 +143,7 @@ app.post('/user', (req, res) => {
 								console.log(rows);
 								console.log(rows.affectedRows);
 								if (rows.affectedRows === 1) {
+									verificationMail({ username: username, email: email });
 									res.sendStatus(200);
 								} else {
 									res.sendStatus(500);

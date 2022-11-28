@@ -18,6 +18,9 @@ CREATE TABLE Users
 	UserId SERIAL PRIMARY KEY,
 	UserName CHAR(50) NOT NULL,
     UNIQUE (UserName),
+	UserEmail CHAR(50) NOT NULL,
+    UNIQUE (UserEmail),
+    Verified boolean default false,
     Pass CHAR(255) NOT NULL,
     Token CHAR(255)
 );
@@ -144,10 +147,9 @@ CREATE TABLE RecipeTags
     FOREIGN KEY (TagId) REFERENCES Tags (TagId)
 );
 
-INSERT INTO Users (UserName, Pass)
+INSERT INTO Users (UserName, Pass, UserEmail)
 VALUES
-	('leo', "password"),
-	('erica', "password");
+	('fakeuser', "password", 'fakeuser@fakeuser.nu');
 
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
@@ -157,7 +159,7 @@ INSERT INTO Recipes (RecipeName,
     RegisterDate)
 VALUES
 	('Köttfärssås', "Gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse1.mm.bing.net%2Fth%3Fid%3DOIP.5UrFhKHsjCzErhgaCjaZ8wHaFj%26pid%3DApi&f=1", 4.0, 1, "2022-07-12"),
-	('Kräftpasta', "Mycket gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse2.mm.bing.net%2Fth%3Fid%3DOIP.z9agqeFaNLoFxZUIV5QvCAHaE8%26pid%3DApi&f=1", 4.0, 2, "2022-07-13");
+	('Kräftpasta', "Mycket gott!", "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse2.mm.bing.net%2Fth%3Fid%3DOIP.z9agqeFaNLoFxZUIV5QvCAHaE8%26pid%3DApi&f=1", 4.0, 1, "2022-07-13");
 
 INSERT INTO Measurements (MeasurementName)
 VALUES
