@@ -16,7 +16,13 @@ const port = process.env.APP_PORT || 4000;
 app.use(express.json());
 
 function generateAccessToken(user) {
-	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15s' });
+}
+
+function generateRefreshToken(user) {
+	return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {
+		expiresIn: '365d',
+	});
 }
 
 function handleErrorResponse(err) {
@@ -120,16 +126,47 @@ app.post('/user', (req, res) => {
 	if (req.body.username && req.body.password && req.body.email) {
 		const username = req.body.username;
 		const email = req.body.email;
-		let sql = `select UserName from Users where
-    UserName = "${username}";`;
+		let sql = `select UserName, UserEmail, Verified from Users where
+    UserName = "${username}" or UserEmail = "${email}";`;
 		db.query(sql, async (err, rows) => {
 			if (err) {
 				console.log(err);
 				res.sendStatus(500);
 			} else {
 				console.log(rows);
-				if (rows.length > 0) {
-					res.sendStatus(409);
+				if (rows.length == 1) {
+					if (rows[0].Verified) {
+						res.sendStatus(409);
+					} else {
+						if (username == rows[0].UserName && email == rows[0].UserEmail) {
+							const newHashedPassword = await bcrypt.hash(
+								req.body.password,
+								10
+							);
+							let sql = `update Users
+								set Pass = "${newHashedPassword}" 
+								where UserName = "${username}" or UserEmail = "${email}";`;
+							db.query(sql, (err, rows) => {
+								if (err) {
+									console.log(err);
+									res.sendStatus(500);
+								} else {
+									console.log(rows);
+									console.log(rows.affectedRows);
+									if (rows.affectedRows === 1) {
+										verificationMail({ username: username, email: email });
+										res.sendStatus(200);
+									} else {
+										res.sendStatus(500);
+									}
+								}
+							});
+						} else {
+							res.sendStatus(409);
+						}
+					}
+				} else if (rows.length > 1) {
+					res.sendStatus(500);
 				} else {
 					try {
 						const hashedPassword = await bcrypt.hash(req.body.password, 10);
@@ -179,11 +216,7 @@ app.post('/login', (req, res) => {
 						if (await bcrypt.compare(password, hashedPassword)) {
 							const user = { user: username };
 							const accessToken = generateAccessToken(user);
-							const refreshToken = jwt.sign(
-								user,
-								process.env.REFRESH_TOKEN_SECRET
-							);
-							console.log(refreshToken.length);
+							const refreshToken = generateRefreshToken(user);
 							let sql2 = `update Users
                 set Token = "${refreshToken}"
                 where UserName = "${username}";`;
@@ -232,8 +265,6 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 		if (err) {
 			res.sendStatus(500);
 		} else {
-			console.log('Rows after logout query');
-			console.log(rows);
 			if (rows.affectedRows === 1) {
 				res.sendStatus(200);
 			} else {
@@ -245,32 +276,13 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 
 // Auth
 
-app.post('/token', (req, res) => {
-	if (req.body.token) {
-		console.log(req.body.token);
-		const refreshToken = req.body.token;
-		let sql = `select UserName from Users
-      where Token = "${refreshToken}";`;
-
-		db.query(sql, (err, rows) => {
-			if (err) {
-				console.log(err);
-				res.sendStatus(500);
-			} else {
-				if (rows.length === 0) {
-					console.log(rows);
-					res.sendStatus(404);
-				} else if (rows.length === 1) {
-					const user = { user: rows[0].UserName };
-					const accessToken = generateAccessToken(user);
-					res.json({ token: accessToken });
-				} else {
-					res.sendStatus(500);
-				}
-			}
-		});
-	} else {
-		res.sendStatus(400);
+app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
+	const username = req.user.user;
+	const user = { user: username };
+	const accessToken = generateAccessToken(user);
+	if (accessToken) {
+		console.log(accessToken);
+		res.json({ token: accessToken });
 	}
 });
 
