@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 
 const app = express();
 
@@ -22,6 +23,12 @@ function generateAccessToken(user) {
 function generateRefreshToken(user) {
 	return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {
 		expiresIn: '365d',
+	});
+}
+
+function generateEmailToken(user) {
+	return jwt.sign(user, process.env.EMAIL_SECRET, {
+		expiresIn: '7d',
 	});
 }
 
@@ -87,13 +94,31 @@ async function verificationMail({ username, email }) {
 			rejectUnauthorized: false,
 		},
 	});
+	console.log('before email token');
+
+	let user = { user: username };
+	let emailToken = generateEmailToken(user);
+	console.log('generated email token');
+	console.log(emailToken);
+	let verifyUrl = `http://${process.env.URL}:${process.env.APP_PORT}/verify/${emailToken}`;
 
 	let mailOptions = {
 		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
 		to: email, // list of receivers
 		subject: 'food verification request', // Subject line
-		text: `Hello ${username}`, // plain text body
-		html: '<b>Hello world?</b>', // html body
+		text: `Hello!`, // plain text body
+		html: `<html>
+							<body>
+								<h1>Verify your account with food</h1>
+								<p>
+									You are reciving this email since you registered for an account with food.
+								</p>
+								<p>Please verify your account to be able to log in.</p>
+								<a href="${verifyUrl}"
+									>Verify</a
+								>
+							</body>
+						</html>`, // html body
 	};
 
 	// send mail with defined transport object
@@ -204,46 +229,33 @@ app.post('/login', (req, res) => {
 		const username = req.body.username;
 		const password = req.body.password;
 		console.log(password.length);
-		let sql1 = `select Pass from Users
+		let sql1 = `select Pass, Verified from Users
       where UserName = "${username}";`;
 		db.query(sql1, async (err, rows) => {
 			if (err) {
 				res.sendStatus(500);
 			} else {
 				if (rows.length === 1) {
-					const hashedPassword = rows[0].Pass;
-					try {
-						if (await bcrypt.compare(password, hashedPassword)) {
-							const user = { user: username };
-							const accessToken = generateAccessToken(user);
-							const refreshToken = generateRefreshToken(user);
-							let sql2 = `update Users
-                set Token = "${refreshToken}"
-                where UserName = "${username}";`;
-
-							db.query(sql2, (err, rows) => {
-								if (err) {
-									console.log(err);
-									res.sendStatus(500);
-								} else {
-									console.log(rows);
-									console.log(rows.affectedRows);
-									if (rows.affectedRows === 1) {
-										res.json({
-											accessToken: accessToken,
-											refreshToken: refreshToken,
-										});
-									} else {
-										res.sendStatus(404);
-									}
-								}
-							});
-						} else {
-							res.sendStatus(401);
+					if (rows[0].Verified) {
+						const hashedPassword = rows[0].Pass;
+						try {
+							if (await bcrypt.compare(password, hashedPassword)) {
+								const user = { user: username };
+								const accessToken = generateAccessToken(user);
+								const refreshToken = generateRefreshToken(user);
+								res.json({
+									accessToken: accessToken,
+									refreshToken: refreshToken,
+								});
+							} else {
+								res.sendStatus(401);
+							}
+						} catch (err) {
+							console.log(err);
+							res.sendStatus(500);
 						}
-					} catch (err) {
-						console.log(err);
-						res.sendStatus(500);
+					} else {
+						res.sendStatus(401);
 					}
 				} else {
 					res.sendStatus(401);
@@ -284,6 +296,62 @@ app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
 		console.log(accessToken);
 		res.json({ token: accessToken });
 	}
+});
+
+app.get('/verify/:id', (req, res) => {
+	const token = req.params.id;
+	jwt.verify(token, process.env.EMAIL_SECRET, (err, user) => {
+		if (err) {
+			console.log('Failed');
+			res.writeHead(200, { 'Content-Type': 'text/html' });
+			html = fs.readFileSync('./responseFailure.html');
+			res.end(html);
+		} else {
+			console.log(user);
+			let sql = `select Verified from Users where UserName = "${user.user}";`;
+			db.query(sql, async (err, rows) => {
+				if (err) {
+					console.log(error);
+					res.sendStatus(500);
+				} else {
+					console.log(rows);
+					if (rows.length == 1) {
+						if (rows[0].Verified) {
+							res.writeHead(200, { 'Content-Type': 'text/html' });
+							html = fs.readFileSync('./responseDone.html');
+							res.end(html);
+						} else {
+							let sql2 = `update Users
+														set Verified = true where UserName = "${user.user}";`;
+							db.query(sql2, (err, rows) => {
+								if (err) {
+									console.log(error);
+									res.sendStatus(500);
+								} else {
+									if (rows.affectedRows === 1) {
+										res.writeHead(200, { 'Content-Type': 'text/html' });
+										html = fs.readFileSync('./responseSuccess.html');
+										res.end(html);
+									} else {
+										res.sendStatus(500);
+									}
+								}
+							});
+						}
+					} else {
+						res.sendStatus(500);
+					}
+				}
+			});
+		}
+	});
+	//const username = req.user.user;
+	//const user = { user: username };
+	//const accessToken = generateAccessToken(user);
+	//if (accessToken) {
+	//	console.log(accessToken);
+	//	res.json({ token: accessToken });
+	//}
 });
 
 app.get('/testtoken', authenticate.authenticateToken, (req, res) => {

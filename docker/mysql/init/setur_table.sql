@@ -27,7 +27,6 @@ CREATE TABLE Users
     UNIQUE (UserEmail),
     Verified boolean default false,
     Pass CHAR(255) NOT NULL,
-    Token CHAR(255),
     HouseHold BIGINT UNSIGNED
 );
 
