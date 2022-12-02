@@ -17,7 +17,7 @@ const port = process.env.APP_PORT || 4000;
 app.use(express.json());
 
 function generateAccessToken(user) {
-	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15s' });
+	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 }
 
 function generateRefreshToken(user) {
@@ -147,6 +147,8 @@ db.connect((err) => {
 	console.log('Connected to db');
 });
 
+// Auth
+
 app.post('/user', (req, res) => {
 	if (req.body.username && req.body.password && req.body.email) {
 		const username = req.body.username;
@@ -229,7 +231,7 @@ app.post('/login', (req, res) => {
 		const username = req.body.username;
 		const password = req.body.password;
 		console.log(password.length);
-		let sql1 = `select Pass, Verified from Users
+		let sql1 = `select UserEmail, Pass, Verified, HouseHoldId from Users
       where UserName = "${username}";`;
 		db.query(sql1, async (err, rows) => {
 			if (err) {
@@ -238,14 +240,36 @@ app.post('/login', (req, res) => {
 				if (rows.length === 1) {
 					if (rows[0].Verified) {
 						const hashedPassword = rows[0].Pass;
+						const email = rows[0].UserEmail;
+						const houseHoldId = rows[0].HouseHoldId;
 						try {
 							if (await bcrypt.compare(password, hashedPassword)) {
-								const user = { user: username };
+								const user = {
+									user: username,
+									email: email,
+									houseHoldId: houseHoldId,
+								};
 								const accessToken = generateAccessToken(user);
 								const refreshToken = generateRefreshToken(user);
-								res.json({
-									accessToken: accessToken,
-									refreshToken: refreshToken,
+								let sql2 = `update Users
+														set Token = "${refreshToken}"
+														where UserName = "${username}";`;
+								db.query(sql2, (err, rows) => {
+									if (err) {
+										console.log(err);
+
+										res.sendStatus(500);
+									} else {
+										if (rows.affectedRows === 1) {
+											res.json({
+												accessToken: accessToken,
+												refreshToken: refreshToken,
+												user: user,
+											});
+										} else {
+											res.sendStatus(500);
+										}
+									}
 								});
 							} else {
 								res.sendStatus(401);
@@ -286,16 +310,26 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 	});
 });
 
-// Auth
-
 app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
 	const username = req.user.user;
-	const user = { user: username };
-	const accessToken = generateAccessToken(user);
-	if (accessToken) {
-		console.log(accessToken);
-		res.json({ token: accessToken });
-	}
+	const authHeader = req.headers['authorization'];
+	const token = authHeader.split(' ')[1];
+	let sql = `select Token from Users where UserName = "${username}"`;
+	db.query(sql, (err, rows) => {
+		if (err) {
+			console.log(err);
+			res.sendStatus(500);
+		} else if (rows.length === 1 && rows[0].Token === token) {
+			const user = { user: username };
+			const accessToken = generateAccessToken(user);
+			if (accessToken) {
+				console.log(accessToken);
+				res.json({ token: accessToken });
+			}
+		} else {
+			res.sendStatus(500);
+		}
+	});
 });
 
 app.get('/verify/:id', (req, res) => {
@@ -345,13 +379,6 @@ app.get('/verify/:id', (req, res) => {
 			});
 		}
 	});
-	//const username = req.user.user;
-	//const user = { user: username };
-	//const accessToken = generateAccessToken(user);
-	//if (accessToken) {
-	//	console.log(accessToken);
-	//	res.json({ token: accessToken });
-	//}
 });
 
 app.get('/testtoken', authenticate.authenticateToken, (req, res) => {
@@ -374,10 +401,25 @@ app.get('/users', authenticate.authenticateToken, (req, res) => {
 
 app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 	console.log(req.user);
-	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
-  from Recipes
-  left join Users on Recipes.RecipeOwner = Users.UserId`;
-	handleQuery(sql, res);
+	if (req.body) {
+		let sql = `select Recipes.RecipeId, 
+								Recipes.RecipeName, 
+								Recipes.RecipeDesc, 
+								Recipes.RecipeImage,  
+								Recipes.RecipePortions,  
+								Recipes.Public,
+								Recipes.RegisterDate, 
+								Users.UserName as RecipeOwner, 
+								Users.HouseHoldId as HouseHoldId 
+							from Recipes left join 
+								Users on Recipes.RecipeOwner = Users.UserId join 
+								InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+							where 
+								(Recipes.Public = true or Users.HouseHoldId = Users2.HouseHoldId) 
+							and 
+								Users2.UserName = "${req.user.user}";`;
+		handleQuery(sql, res);
+	} else res.sendStatus(400);
 });
 
 app.get('/recipe/:id', authenticate.authenticateToken, (req, res) => {
@@ -429,6 +471,13 @@ app.get('/recipesteps/:id', authenticate.authenticateToken, (req, res) => {
 
 app.get('/measurements', authenticate.authenticateToken, (req, res) => {
 	let sql = 'select * from Measurements';
+	handleQuery(sql, res);
+});
+
+// storesections
+
+app.get('/storesections', authenticate.authenticateToken, (req, res) => {
+	let sql = 'select * from StoreSections';
 	handleQuery(sql, res);
 });
 
@@ -599,10 +648,11 @@ app.post('/entirerecipe', authenticate.authenticateToken, (req, res) => {
 app.post('/ingredient', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
 	let sql = `insert into Ingredients (IngredientName, 
-    MeasurementId)
+    MeasurementId, StoreSectionId)
   values 
     ("${req.body.IngredientName}", 
-    ${req.body.MeasurementId});`;
+    ${req.body.MeasurementId}, 
+		${req.body.StoreSectionId});`;
 
 	handleQuery(sql, res);
 });
@@ -908,6 +958,30 @@ app.delete('/listcontent', authenticate.authenticateToken, (req, res) => {
 
 // patch requests
 
+// users
+
+app.patch('/user', authenticate.authenticateToken, async (req, res) => {
+	let updates = '';
+	if (req.body.Pass) {
+		const newHashedPassword = await bcrypt.hash(req.body.Pass, 10);
+		updates = updates.concat(` Pass = "${newHashedPassword}",`);
+	}
+	if (req.body.HouseHold) {
+		updates = updates.concat(` HouseHold = ${req.body.HouseHold},`);
+	}
+	console.log(updates);
+	if (updates === '') {
+		res.sendStatus(400);
+	} else {
+		const newUpdates = updates.slice(0, updates.length - 1);
+		let sql = `update Users
+        set ${newUpdates}
+        where Username = "${req.user.user}";`;
+		console.log(sql);
+		handleQuery(sql, res);
+	}
+});
+
 // recipes
 
 app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
@@ -934,6 +1008,9 @@ app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
 		}
 		if (req.body.RegisterDate) {
 			updates = updates.concat(` RegisterDate = "${req.body.RegisterDate}",`);
+		}
+		if (req.body.Public) {
+			updates = updates.concat(` Public = ${req.body.Public},`);
 		}
 		console.log(updates);
 		if (updates === '') {
@@ -963,7 +1040,10 @@ app.patch('/ingredient', authenticate.authenticateToken, (req, res) => {
 			);
 		}
 		if (req.body.MeasurementId) {
-			updates = updates.concat(` MeasurementId = "${req.body.MeasurementId}",`);
+			updates = updates.concat(` MeasurementId = ${req.body.MeasurementId},`);
+		}
+		if (req.body.StoreSectionId) {
+			updates = updates.concat(` StoreSectionId = ${req.body.StoreSectionId},`);
 		}
 		if (updates === '') {
 			res.sendStatus(400);

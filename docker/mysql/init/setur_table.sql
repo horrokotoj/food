@@ -15,8 +15,16 @@ DROP TABLE IF EXISTS Measurements;
 DROP TABLE IF EXISTS Steps;
 DROP TABLE IF EXISTS Recipes;
 DROP TABLE IF EXISTS InHouseHold;
-DROP TABLE IF EXISTS HouseHold;
 DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS HouseHolds;
+
+CREATE TABLE HouseHolds
+(
+	HouseHoldId SERIAL PRIMARY KEY,
+	HouseHoldName CHAR(50) NOT NULL,
+    UNIQUE (HouseHoldName),
+    HouseHoldOwner BIGINT UNSIGNED NOT NULL
+);
 
 CREATE TABLE Users
 (
@@ -25,17 +33,12 @@ CREATE TABLE Users
     UNIQUE (UserName),
 	UserEmail CHAR(50) NOT NULL,
     UNIQUE (UserEmail),
+    Token CHAR(255),
     Verified boolean default false,
     Pass CHAR(255) NOT NULL,
-    HouseHold BIGINT UNSIGNED
-);
+    HouseHoldId BIGINT UNSIGNED,
+    FOREIGN KEY (HouseHoldId) REFERENCES HouseHolds (HouseHoldId)
 
-CREATE TABLE HouseHold
-(
-	HouseHoldId SERIAL PRIMARY KEY,
-	HouseHoldName CHAR(50) NOT NULL,
-    UNIQUE (HouseHoldName),
-    HouseHoldOwner BIGINT UNSIGNED NOT NULL
 );
 
 CREATE TABLE InHouseHold
@@ -47,7 +50,7 @@ CREATE TABLE InHouseHold
 			HouseHoldId,
 			UserId
 	),
-    FOREIGN KEY (HouseHoldId) REFERENCES HouseHold (HouseHoldId),
+    FOREIGN KEY (HouseHoldId) REFERENCES HouseHolds (HouseHoldId),
     FOREIGN KEY (UserId) REFERENCES Users (UserId)
 );
 
@@ -62,7 +65,7 @@ CREATE TABLE Recipes
     RecipeOwner BIGINT UNSIGNED NOT NULL,
     FOREIGN KEY (RecipeOwner) REFERENCES Users (UserId),
     RegisterDate DATE NOT NULL,
-    Public boolean default false NOT NULL
+    Public boolean default true NOT NULL
 );
 
 CREATE TABLE Steps
@@ -203,9 +206,22 @@ CREATE TABLE RecipeTags
     FOREIGN KEY (TagId) REFERENCES Tags (TagId)
 );
 
+
 INSERT INTO Users (UserName, Pass, UserEmail)
 VALUES
 	('fakeuser', "password", 'fakeuser@fakeuser.nu');
+
+INSERT INTO HouseHolds (HouseHoldName, HouseHoldOwner)
+VALUES
+    ("Familjen Arnholm Söderberg", 1);
+
+UPDATE Users 
+    set HouseHoldId = 1
+    where UserId = 1;
+
+INSERT INTO InHouseHold (HouseHoldId, UserId)
+VALUES
+    (1, 1);
 
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
@@ -230,52 +246,59 @@ VALUES
     ("Kök"),
     ("Lampor & Batterier"),
     ("Leksaker"),
+    ("Baby"),
     ("Bröd"),
     ("Ost"),
     ("Pålägg"),
-    ("Kött"),
+    ("Kött, Fisk & Skaldjur"),
+    ("Korv"),
     ("Frukt & Grönt"),
+    ("Juice"),
     ("Ägg"),
     ("Mejeri"),
     ("Frys"),
-    ("Sylt"),
+    ("Havremjölk & annat PK"),
+    ("Glass"),
+    ("Sylt & Marmelad"),
+    ("Torkad frukt & Nötter"),
     ("Bak"),
-    ("Baby"),
     ("Glutenfritt"),
     ("Godis & Snacks"),
-    ("Skafferi"),
-    ("Kaffe"),
+    ("Konserverad frukt"),
+    ("Kaffe & Te"),
     ("Ris"),
     ("Pasta"),
     ("Tacos"),
     ("All världens mat"),
-    ("Olja"),
-    ("Ketchup & Senap"),
+    ("Kryddor"),
+    ("Buljong & Fond"),
+    ("Olja & Vinäger"),
+    ("Ketchup & Senap mm"),
     ("Konserver"),
-    ("Dryck"),
-    ("Papper"),
-    ("Städ"),
     ("Husdjur"),
+    ("Toa- & Hushållspapper"),
+    ("Städ"),
+    ("Dryck"),
     ("Kassan"),
     ("Övrigt");
 
 INSERT INTO Ingredients (IngredientName, MeasurementId, StoreSectionId)
 VALUES
-    ("Nötfärs", 1, 9),
-    ("Krossade Tomater", 1, 27),
-    ("Gullök", 3, 10),
-    ("Vitlöksklyfta", 3, 10),
-    ("Tomatpuré", 2, 26),
-    ("Kokosmjölk", 2, 24),
-    ("Dijonsenap", 2, 26),
-    ("Köttbuljongtärning", 3, 24),
-    ("Oregano", 2, 10),
-    ("Spaghetti", 1, 22),
-    ("Linguini", 1, 22),
-    ("Kräftskjärtar", 1, 9),
-    ("Grädde", 2, 12),
-    ("Sambal oelek", 2, 24),
-    ("Purjulök", 3, 10);
+    ("Nötfärs", 1, 10),
+    ("Krossade Tomater", 1, 34),
+    ("Gullök", 3, 12),
+    ("Vitlöksklyfta", 3, 12),
+    ("Tomatpuré", 2, 33),
+    ("Kokosmjölk", 2, 29),
+    ("Dijonsenap", 2, 33),
+    ("Köttbuljongtärning", 3, 31),
+    ("Oregano", 2, 12),
+    ("Spaghetti", 1, 27),
+    ("Linguini", 1, 27),
+    ("Kräftskjärtar", 1, 10),
+    ("Grädde", 2, 15),
+    ("Sambal oelek", 2, 29),
+    ("Purjulök", 3, 12);
 
 INSERT INTO Stores (StoreName)
 VALUES
@@ -315,7 +338,14 @@ VALUES
     (1, 30, 30), 
     (1, 31, 31), 
     (1, 32, 32), 
-    (1, 33, 33);
+    (1, 33, 33),
+    (1, 34, 34),
+    (1, 35, 35),
+    (1, 36, 36),
+    (1, 37, 37),
+    (1, 38, 38),
+    (1, 39, 39),
+    (1, 40, 40);
 
 INSERT INTO RecipeIngredients (RecipeId, IngredientId, Quantity)
 VALUES
