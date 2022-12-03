@@ -402,7 +402,7 @@ app.get('/users', authenticate.authenticateToken, (req, res) => {
 app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 	console.log(req.user);
 	if (req.body) {
-		let sql = `select Recipes.RecipeId, 
+		let sql = `select distinct Recipes.RecipeId, 
 								Recipes.RecipeName, 
 								Recipes.RecipeDesc, 
 								Recipes.RecipeImage,  
@@ -415,9 +415,11 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 								Users on Recipes.RecipeOwner = Users.UserId join 
 								InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
 							where 
-								(Recipes.Public = true or Users.HouseHoldId = Users2.HouseHoldId) 
-							and 
-								Users2.UserName = "${req.user.user}";`;
+								Recipes.Public = true
+							or
+								(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+							or 
+								Users.UserName = "${req.user.user}";`;
 		handleQuery(sql, res);
 	} else res.sendStatus(400);
 });
