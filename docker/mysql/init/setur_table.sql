@@ -23,7 +23,8 @@ CREATE TABLE HouseHolds
 	HouseHoldId SERIAL PRIMARY KEY,
 	HouseHoldName CHAR(50) NOT NULL,
     UNIQUE (HouseHoldName),
-    HouseHoldOwner BIGINT UNSIGNED NOT NULL
+    HouseHoldOwner BIGINT UNSIGNED NOT NULL,
+    DefaultStore BIGINT UNSIGNED
 );
 
 CREATE TABLE Users
@@ -140,10 +141,12 @@ CREATE TABLE RecipeIngredients
 CREATE TABLE RecipeCalendar
 (
     RecipeCalendarId SERIAL PRIMARY KEY,
+    UserId BIGINT UNSIGNED NOT NULL,
+    FOREIGN KEY (UserId) REFERENCES Users (UserId),
     RecipeDate DATE NOT NULL,
     RecipeId BIGINT UNSIGNED NOT NULL,
-    Portions FLOAT NOT NULL,
-    FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId)
+    FOREIGN KEY (RecipeId) REFERENCES Recipes (RecipeId),
+    Portions FLOAT NOT NULL
 );
 
 CREATE TABLE ShoppingLists
@@ -152,7 +155,9 @@ CREATE TABLE ShoppingLists
     ShoppingListName CHAR(255),
     UNIQUE (ShoppingListName),
     StartDate DATE,
-    EndDate DATE
+    EndDate DATE,
+    UserId BIGINT UNSIGNED NOT NULL,
+    FOREIGN KEY (UserId) REFERENCES Users (UserId)
 );
 
 CREATE TABLE ListContents
@@ -166,11 +171,13 @@ CREATE TABLE ListContents
 	),
     FOREIGN KEY (ShoppingListId) REFERENCES ShoppingLists (ShoppingListId),
     FOREIGN KEY (IngredientId) REFERENCES Ingredients (IngredientId),
-    Indexx BIGINT UNSIGNED,
+    Indexx BIGINT UNSIGNED default 0,
     IngredientName CHAR(255) NOT NULL, 
     Quantity FLOAT NOT NULL,
-    QuantityAvailable FLOAT,
-    Picked BOOLEAN NOT NULL
+    QuantityAvailable FLOAT default 0,
+    Picked BOOLEAN NOT NULL default false,
+    MeasurementId BIGINT UNSIGNED NOT NULL,
+    FOREIGN KEY (MeasurementId) REFERENCES Measurements (MeasurementId)
 );
 
 CREATE TABLE TickedSteps
@@ -207,9 +214,11 @@ CREATE TABLE RecipeTags
 );
 
 
-INSERT INTO Users (UserName, Pass, UserEmail)
+INSERT INTO Users (UserName, Pass, UserEmail, Verified)
 VALUES
-	('fakeuser', "password", 'fakeuser@fakeuser.nu');
+	('fakeuser', "password", 'fakeuser@fakeuser.nu', 1),
+	('test', "$2b$10$QEPaYSPz9dqgrUUI.ZIzSuHy.819KiTSJS7ffvpVPUD1lv781eosG", "leo@horrokotoj.com", 1),
+	('test2', "passwrod", "leo2@horrokotoj.com", 1);
 
 INSERT INTO HouseHolds (HouseHoldName, HouseHoldOwner)
 VALUES
@@ -219,9 +228,14 @@ UPDATE Users
     set HouseHoldId = 1
     where UserId = 1;
 
+UPDATE Users 
+    set HouseHoldId = 1
+    where UserId = 2;
+
 INSERT INTO InHouseHold (HouseHoldId, UserId)
 VALUES
-    (1, 1);
+    (1, 1),
+    (1, 2);
 
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
@@ -304,6 +318,9 @@ INSERT INTO Stores (StoreName)
 VALUES
     ("Ica Maxi Nacka");
 
+update HouseHolds
+set DefaultStore = 1 where HouseHoldId = 1;
+
 INSERT INTO SectionOrder (StoreId, StoreSectionId, OrderOfSection)
 VALUES
     (1, 1, 1),
@@ -371,9 +388,10 @@ VALUES
     (2, 1, "Laga maten"),
     (3, 1, "Servera maten");
 
-INSERT INTO RecipeCalendar (RecipeDate, RecipeId, Portions)
+INSERT INTO RecipeCalendar (UserId,RecipeDate, RecipeId, Portions)
 VALUES
-    ("2022-07-15", 1, 4),
-    ("2022-07-16", 2, 4),
-    ("2022-07-17", 1, 4),
-    ("2022-07-18", 2, 2);
+    (1, "2022-12-15", 1, 4),
+    (1, "2022-12-16", 2, 4),
+    (1, "2022-12-17", 1, 4),
+    (1, "2022-12-18", 2, 2),
+    (3, "2022-12-18", 2, 2);
