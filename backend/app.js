@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 
 const app = express();
 
@@ -17,6 +18,18 @@ app.use(express.json());
 
 function generateAccessToken(user) {
 	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+}
+
+function generateRefreshToken(user) {
+	return jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, {
+		expiresIn: '365d',
+	});
+}
+
+function generateEmailToken(user) {
+	return jwt.sign(user, process.env.EMAIL_SECRET, {
+		expiresIn: '7d',
+	});
 }
 
 function handleErrorResponse(err) {
@@ -81,13 +94,31 @@ async function verificationMail({ username, email }) {
 			rejectUnauthorized: false,
 		},
 	});
+	console.log('before email token');
+
+	let user = { user: username };
+	let emailToken = generateEmailToken(user);
+	console.log('generated email token');
+	console.log(emailToken);
+	let verifyUrl = `http://${process.env.URL}:${process.env.APP_PORT}/verify/${emailToken}`;
 
 	let mailOptions = {
 		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
 		to: email, // list of receivers
 		subject: 'food verification request', // Subject line
-		text: `Hello ${username}`, // plain text body
-		html: '<b>Hello world?</b>', // html body
+		text: `Hello!`, // plain text body
+		html: `<html>
+							<body>
+								<h1>Verify your account with food</h1>
+								<p>
+									You are reciving this email since you registered for an account with food.
+								</p>
+								<p>Please verify your account to be able to log in.</p>
+								<a href="${verifyUrl}"
+									>Verify</a
+								>
+							</body>
+						</html>`, // html body
 	};
 
 	// send mail with defined transport object
@@ -116,20 +147,53 @@ db.connect((err) => {
 	console.log('Connected to db');
 });
 
+// Auth
+
 app.post('/user', (req, res) => {
 	if (req.body.username && req.body.password && req.body.email) {
 		const username = req.body.username;
-		const email = req.body.email;
-		let sql = `select UserName from Users where
-    UserName = "${username}";`;
+		const email = req.body.email.toLowerCase();
+		let sql = `select UserName, UserEmail, Verified from Users where
+    UserName = "${username}" or UserEmail = "${email}";`;
 		db.query(sql, async (err, rows) => {
 			if (err) {
 				console.log(err);
 				res.sendStatus(500);
 			} else {
 				console.log(rows);
-				if (rows.length > 0) {
-					res.sendStatus(409);
+				if (rows.length == 1) {
+					if (rows[0].Verified) {
+						res.sendStatus(409);
+					} else {
+						if (username == rows[0].UserName && email == rows[0].UserEmail) {
+							const newHashedPassword = await bcrypt.hash(
+								req.body.password,
+								10
+							);
+							let sql = `update Users
+								set Pass = "${newHashedPassword}" 
+								where UserName = "${username}" or UserEmail = "${email}";`;
+							db.query(sql, (err, rows) => {
+								if (err) {
+									console.log(err);
+									res.sendStatus(500);
+								} else {
+									console.log(rows);
+									console.log(rows.affectedRows);
+									if (rows.affectedRows === 1) {
+										verificationMail({ username: username, email: email });
+										res.sendStatus(200);
+									} else {
+										res.sendStatus(500);
+									}
+								}
+							});
+						} else {
+							res.sendStatus(409);
+						}
+					}
+				} else if (rows.length > 1) {
+					res.sendStatus(500);
 				} else {
 					try {
 						const hashedPassword = await bcrypt.hash(req.body.password, 10);
@@ -167,50 +231,55 @@ app.post('/login', (req, res) => {
 		const username = req.body.username;
 		const password = req.body.password;
 		console.log(password.length);
-		let sql1 = `select Pass from Users
+		let sql1 = `select UserEmail, Pass, Verified, HouseHoldId from Users
       where UserName = "${username}";`;
 		db.query(sql1, async (err, rows) => {
 			if (err) {
 				res.sendStatus(500);
 			} else {
 				if (rows.length === 1) {
-					const hashedPassword = rows[0].Pass;
-					try {
-						if (await bcrypt.compare(password, hashedPassword)) {
-							const user = { user: username };
-							const accessToken = generateAccessToken(user);
-							const refreshToken = jwt.sign(
-								user,
-								process.env.REFRESH_TOKEN_SECRET
-							);
-							console.log(refreshToken.length);
-							let sql2 = `update Users
-                set Token = "${refreshToken}"
-                where UserName = "${username}";`;
+					if (rows[0].Verified) {
+						const hashedPassword = rows[0].Pass;
+						const email = rows[0].UserEmail;
+						const houseHoldId = rows[0].HouseHoldId;
+						try {
+							if (await bcrypt.compare(password, hashedPassword)) {
+								const user = {
+									user: username,
+									email: email,
+									houseHoldId: houseHoldId,
+								};
+								const accessToken = generateAccessToken(user);
+								const refreshToken = generateRefreshToken(user);
+								let sql2 = `update Users
+														set Token = "${refreshToken}"
+														where UserName = "${username}";`;
+								db.query(sql2, (err, rows) => {
+									if (err) {
+										console.log(err);
 
-							db.query(sql2, (err, rows) => {
-								if (err) {
-									console.log(err);
-									res.sendStatus(500);
-								} else {
-									console.log(rows);
-									console.log(rows.affectedRows);
-									if (rows.affectedRows === 1) {
-										res.json({
-											accessToken: accessToken,
-											refreshToken: refreshToken,
-										});
+										res.sendStatus(500);
 									} else {
-										res.sendStatus(404);
+										if (rows.affectedRows === 1) {
+											res.json({
+												accessToken: accessToken,
+												refreshToken: refreshToken,
+												user: user,
+											});
+										} else {
+											res.sendStatus(500);
+										}
 									}
-								}
-							});
-						} else {
-							res.sendStatus(401);
+								});
+							} else {
+								res.sendStatus(401);
+							}
+						} catch (err) {
+							console.log(err);
+							res.sendStatus(500);
 						}
-					} catch (err) {
-						console.log(err);
-						res.sendStatus(500);
+					} else {
+						res.sendStatus(401);
 					}
 				} else {
 					res.sendStatus(401);
@@ -232,8 +301,6 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 		if (err) {
 			res.sendStatus(500);
 		} else {
-			console.log('Rows after logout query');
-			console.log(rows);
 			if (rows.affectedRows === 1) {
 				res.sendStatus(200);
 			} else {
@@ -243,35 +310,75 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 	});
 });
 
-// Auth
-
-app.post('/token', (req, res) => {
-	if (req.body.token) {
-		console.log(req.body.token);
-		const refreshToken = req.body.token;
-		let sql = `select UserName from Users
-      where Token = "${refreshToken}";`;
-
-		db.query(sql, (err, rows) => {
-			if (err) {
-				console.log(err);
-				res.sendStatus(500);
-			} else {
-				if (rows.length === 0) {
-					console.log(rows);
-					res.sendStatus(404);
-				} else if (rows.length === 1) {
-					const user = { user: rows[0].UserName };
-					const accessToken = generateAccessToken(user);
-					res.json({ token: accessToken });
-				} else {
-					res.sendStatus(500);
-				}
+app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
+	const username = req.user.user;
+	const authHeader = req.headers['authorization'];
+	const token = authHeader.split(' ')[1];
+	let sql = `select Token from Users where UserName = "${username}"`;
+	db.query(sql, (err, rows) => {
+		if (err) {
+			console.log(err);
+			res.sendStatus(500);
+		} else if (rows.length === 1 && rows[0].Token === token) {
+			const user = { user: username };
+			const accessToken = generateAccessToken(user);
+			if (accessToken) {
+				console.log(accessToken);
+				res.json({ token: accessToken });
 			}
-		});
-	} else {
-		res.sendStatus(400);
-	}
+		} else {
+			res.sendStatus(500);
+		}
+	});
+});
+
+app.get('/verify/:id', (req, res) => {
+	const token = req.params.id;
+	jwt.verify(token, process.env.EMAIL_SECRET, (err, user) => {
+		if (err) {
+			console.log('Failed');
+			res.writeHead(200, { 'Content-Type': 'text/html' });
+			html = fs.readFileSync('./responseFailure.html');
+			res.end(html);
+		} else {
+			console.log(user);
+			let sql = `select Verified from Users where UserName = "${user.user}";`;
+			db.query(sql, async (err, rows) => {
+				if (err) {
+					console.log(error);
+					res.sendStatus(500);
+				} else {
+					console.log(rows);
+					if (rows.length == 1) {
+						if (rows[0].Verified) {
+							res.writeHead(200, { 'Content-Type': 'text/html' });
+							html = fs.readFileSync('./responseDone.html');
+							res.end(html);
+						} else {
+							let sql2 = `update Users
+														set Verified = true where UserName = "${user.user}";`;
+							db.query(sql2, (err, rows) => {
+								if (err) {
+									console.log(error);
+									res.sendStatus(500);
+								} else {
+									if (rows.affectedRows === 1) {
+										res.writeHead(200, { 'Content-Type': 'text/html' });
+										html = fs.readFileSync('./responseSuccess.html');
+										res.end(html);
+									} else {
+										res.sendStatus(500);
+									}
+								}
+							});
+						}
+					} else {
+						res.sendStatus(500);
+					}
+				}
+			});
+		}
+	});
 });
 
 app.get('/testtoken', authenticate.authenticateToken, (req, res) => {
@@ -294,9 +401,25 @@ app.get('/users', authenticate.authenticateToken, (req, res) => {
 
 app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 	console.log(req.user);
-	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
-  from Recipes
-  left join Users on Recipes.RecipeOwner = Users.UserId`;
+
+	let sql = `select distinct Recipes.RecipeId, 
+							Recipes.RecipeName, 
+							Recipes.RecipeDesc, 
+							Recipes.RecipeImage,  
+							Recipes.RecipePortions,  
+							Recipes.Public,
+							CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate, 
+							Users.UserName as RecipeOwner, 
+							Users.HouseHoldId as HouseHoldId 
+						from Recipes left join 
+							Users on Recipes.RecipeOwner = Users.UserId join 
+							InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+						where 
+							Recipes.Public = true
+						or
+							(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+						or 
+							Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
 });
 
@@ -352,10 +475,33 @@ app.get('/measurements', authenticate.authenticateToken, (req, res) => {
 	handleQuery(sql, res);
 });
 
+// storesections
+
+app.get('/storesections', authenticate.authenticateToken, (req, res) => {
+	let sql = 'select * from StoreSections';
+	handleQuery(sql, res);
+});
+
 // recipecalendar
 
 app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
-	let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar`;
+	let sql = `select distinct RecipeCalendar.RecipeCalendarId, 
+							RecipeCalendar.RecipeId, 
+							Users.UserName as IssuedUser, 
+							CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+							RecipeCalendar.Portions, 
+							Recipes.RecipeName, 
+							Recipes.RecipeDesc, 
+							Recipes.RecipeImage
+						from RecipeCalendar left join 
+							Users on RecipeCalendar.UserId = Users.UserId 
+							join InHouseHold 
+							left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+							left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+						where 
+							(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+						or 
+							Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
 });
 
@@ -369,36 +515,76 @@ app.get(
 );
 
 app.get(
-	'/recipecalendar/intervall/:yearstart/:monthstart/:daystart/:yearstop/:monthstop/:daystop',
+	'/recipecalendar/intervall/',
 	authenticate.authenticateToken,
 	(req, res) => {
-		let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate between "${req.params.yearstart}-${req.params.monthstart}-${req.params.daystart}" and "${req.params.yearstop}-${req.params.monthstop}-${req.params.daystop}"`;
-		handleQuery(sql, res);
+		if (req.body.startDate && req.body.endDate) {
+			let sql = `
+			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
+	from RecipeCalendar left join 
+	Users on RecipeCalendar.UserId = Users.UserId 
+	join InHouseHold 
+	left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+	left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+	where 
+	((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+	or 
+	Users.UserName = "${req.user.user}") and 
+	(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}");
+			`;
+			handleQuery(sql, res);
+		} else {
+			res.sendStatus(400);
+		}
 	}
 );
 
 // shoppinglists
 
 app.get('/shoppinglists', authenticate.authenticateToken, (req, res) => {
-	let sql = 'select * from ShoppingLists';
+	let sql = `select distinct ShoppingLists.ShoppingListId, ShoppingLists.ShoppingListName, ShoppingLists.StartDate, ShoppingLists.EndDate, Users.UserName as IssuedUser from ShoppingLists 
+	left join Users on ShoppingLists.UserId = Users.UserId
+	join InHouseHold
+	left join Users as Users2 on InHouseHold.UserId = Users2.UserId
+	where (Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+	or
+	Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
 });
 
 app.get(
-	'/shoppinglist/intervall/:yearstart/:monthstart/:daystart/:yearstop/:monthstop/:daystop',
+	'/shoppinglist/intervall/',
 	authenticate.authenticateToken,
 	(req, res) => {
-		let sql = `select Ingredients.IngredientName, sum((RecipeCalendar.Portions/Recipes.RecipePortions)*RecipeIngredients.Quantity) as FinalQuantity from RecipeCalendar
-  left join Recipes
-  on RecipeCalendar.RecipeId = Recipes.RecipeId 
-  left join RecipeIngredients 
-  on Recipes.RecipeId = RecipeIngredients.RecipeId
-  left join Ingredients 
-  on RecipeIngredients.IngredientId = Ingredients.IngredientId 
-  where RecipeCalendar.RecipeDate between "${req.params.yearstart}-${req.params.monthstart}-${req.params.daystart}" and "${req.params.yearstop}-${req.params.monthstop}-${req.params.daystop}"
-  group by IngredientName;`;
+		if (req.body.startDate && req.body.endDate) {
+			let sql = `select 
+			Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as FinalQuantity
+			from (
+			select distinct RecipeCalendar.RecipeCalendarId, 
+			Users.UserName as IssuedUser, 
+			Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+			RecipeCalendar.RecipeId, 
+			RecipeCalendar.Portions as CalendarPortions, 
+			Recipes.RecipePortions as RecipePortions
+				from RecipeCalendar left join 
+				Users on RecipeCalendar.UserId = Users.UserId 
+				join InHouseHold 
+				left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+				left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+				where 
+				((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+				or 
+				Users.UserName = "${req.user.user}") and 
+				(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
+			) as RecipeCalendar
+			left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
+			left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
+			group by Ingredients.IngredientName;`;
 
-		handleQuery(sql, res);
+			handleQuery(sql, res);
+		} else {
+			res.sendStatus(400);
+		}
 	}
 );
 
@@ -519,10 +705,11 @@ app.post('/entirerecipe', authenticate.authenticateToken, (req, res) => {
 app.post('/ingredient', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
 	let sql = `insert into Ingredients (IngredientName, 
-    MeasurementId)
+    MeasurementId, StoreSectionId)
   values 
     ("${req.body.IngredientName}", 
-    ${req.body.MeasurementId});`;
+    ${req.body.MeasurementId}, 
+		${req.body.StoreSectionId});`;
 
 	handleQuery(sql, res);
 });
@@ -568,13 +755,32 @@ app.post('/measurement', authenticate.authenticateToken, (req, res) => {
 
 app.post('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
-	let sql = `insert into RecipeCalendar (RecipeDate, RecipeId, Portions)
-  values 
-    ("${req.body.RecipeDate}",
-    ${req.body.RecipeId},
-    ${req.body.Portions});`;
 
-	handleQuery(sql, res);
+	if (req.body.RecipeDate && req.body.RecipeId && req.body.Portions) {
+		let sqlName = `select UserId from Users where UserName = "${req.user.user}";`;
+		db.query(sqlName, (err, rows) => {
+			if (err) {
+				console.log(err);
+				res.sendStatus(handleErrorResponse(err));
+			} else {
+				console.log(rows);
+				if (rows.length === 1) {
+					let UserId = rows[0].UserId;
+					let sql = `insert into RecipeCalendar (UserId, RecipeDate, RecipeId, Portions)
+						values 
+							(${UserId},
+							"${req.body.RecipeDate}",
+							${req.body.RecipeId},
+							${req.body.Portions});`;
+					handleQuery(sql, res);
+				} else {
+					res.sendStatus(500);
+				}
+			}
+		});
+	} else {
+		res.sendStatus(400);
+	}
 });
 
 // shoppinglists
@@ -641,25 +847,165 @@ app.post('/listcontent', authenticate.authenticateToken, (req, res) => {
 });
 
 app.post(
-	'/listcontents/intervall',
+	'/shoppinglist/intervall',
 	authenticate.authenticateToken,
 	(req, res) => {
 		console.log(req.body);
-		if (req.body.ShoppingListId) {
-			let sql = `insert into ListContents (ShoppingListId, IngredientId, Ingredientname, Quantity, Picked)
-    select ${req.body.ShoppingListId}, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.Portions/Recipes.RecipePortions)*RecipeIngredients.Quantity) 
-    as Quantity, false from RecipeCalendar
-    left join Recipes
-    on RecipeCalendar.RecipeId = Recipes.RecipeId
-    left join RecipeIngredients
-    on Recipes.RecipeId = RecipeIngredients.RecipeId
-    left join Ingredients
-    on RecipeIngredients.IngredientId = Ingredients.IngredientId
-    where RecipeCalendar.RecipeDate between 
-    (select StartDate from ShoppingLists where ShoppingListId = ${req.body.ShoppingListId})
-    and
-    (select EndDate from ShoppingLists where ShoppingListId = ${req.body.ShoppingListId})
-    group by IngredientId;`;
+		if (req.body.startDate && req.body.endDate) {
+			let sqlUserId = `select UserId from Users where UserName = "${req.user.user}";`;
+			db.query(sqlUserId, (err, rows) => {
+				if (err) {
+					console.log(err);
+					res.sendStatus(500);
+				} else {
+					if (rows.length === 1) {
+						let UserId = rows[0].UserId;
+						let sqlList = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate, UserId)
+							values
+							("${req.body.startDate} - ${req.body.endDate}", "${req.body.startDate}", "${req.body.endDate}", ${UserId});`;
+						db.query(sqlList, (err, rows) => {
+							if (err) {
+								console.log(err);
+								res.sendStatus(500);
+							} else {
+								let ShoppingListId = rows.insertId;
+								let sqlStoreId = `select DefaultStore from Users
+									left join InHouseHold on (Users.UserId = InHouseHold.UserId)
+									left join HouseHolds on (InHouseHold.HouseHoldId = HouseHolds.HouseHoldId)
+									where Users.UserName = "${req.user.user}";`;
+								db.query(sqlStoreId, (err, rows) => {
+									if (err) {
+										console.log(err);
+										res.sendStatus(500);
+									} else if (rows.length == 1) {
+										let sql;
+										if (rows[0].DefaultStore) {
+											let StoreId = rows[0].DefaultStore;
+											sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, MeasurementName, Indexx)
+													(select
+													ShoppingLists.ShoppingListId,
+													Ingredients.IngredientId,
+													Ingredients.IngredientName,
+													sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity,
+													Measurements.MeasurementName,
+													SectionOrder.OrderOfSection
+													from (
+													select distinct RecipeCalendar.RecipeCalendarId,
+													Users.UserName as IssuedUser,
+													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													RecipeCalendar.RecipeId,
+													RecipeCalendar.Portions as CalendarPortions,
+													Recipes.RecipePortions as RecipePortions
+													from RecipeCalendar left join
+													Users on RecipeCalendar.UserId = Users.UserId
+													join InHouseHold
+													left join Users as Users2 on InHouseHold.UserId = Users2.UserId
+													left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+													where
+													((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+													or
+													Users.UserName = "${req.user.user}") and
+													(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
+													) as RecipeCalendar
+													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
+													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
+													left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId
+													left join SectionOrder on Ingredients.StoreSectionId = SectionOrder.StoreSectionId
+													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
+													where SectionOrder.StoreId = ${StoreId}
+													group by Ingredients.IngredientName);`;
+										} else {
+											sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity)
+													(
+													select
+													ShoppingLists.ShoppingListId, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity
+													from (
+													select distinct RecipeCalendar.RecipeCalendarId,
+													Users.UserName as IssuedUser,
+													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													RecipeCalendar.RecipeId,
+													RecipeCalendar.Portions as CalendarPortions,
+													Recipes.RecipePortions as RecipePortions
+														from RecipeCalendar left join
+														Users on RecipeCalendar.UserId = Users.UserId
+														join InHouseHold
+														left join Users as Users2 on InHouseHold.UserId = Users2.UserId
+														left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+														where
+														((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+														or
+														Users.UserName = "${req.user.user}") and
+														(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
+													) as RecipeCalendar
+													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
+													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
+													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
+													group by Ingredients.IngredientName
+													);`;
+										}
+										handleQuery(sql, res);
+									} else {
+										res.sendStatus(500);
+									}
+								});
+							}
+						});
+					} else {
+						console.log(rows);
+						res.sendStatus(500);
+					}
+				}
+			});
+		} else {
+			res.sendStatus(400);
+		}
+	}
+);
+
+app.post(
+	'/listcontents/intervall/ordered',
+	authenticate.authenticateToken,
+	(req, res) => {
+		console.log(req.body);
+		if (
+			req.body.ShoppingListId &&
+			req.body.startDate &&
+			req.body.startDate &&
+			req.body.StoreId
+		) {
+			let sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, Indexx)
+			(
+				select 
+				ShoppingLists.ShoppingListId, 
+				Ingredients.IngredientId, 
+				Ingredients.IngredientName, 
+				sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity,
+				SectionOrder.OrderOfSection
+				from (
+				select distinct RecipeCalendar.RecipeCalendarId, 
+				Users.UserName as IssuedUser, 
+				Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+				RecipeCalendar.RecipeId, 
+				RecipeCalendar.Portions as CalendarPortions, 
+				Recipes.RecipePortions as RecipePortions
+				from RecipeCalendar left join 
+				Users on RecipeCalendar.UserId = Users.UserId 
+				join InHouseHold 
+				left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+				left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+				where 
+				((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${rew.user.user}")
+				or 
+				Users.UserName = "${rew.user.user}") and 
+				(RecipeCalendar.RecipeDate between "${req.body.startdate}" and "${req.body.endDate}")
+				) as RecipeCalendar
+				left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
+				left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
+				left join SectionOrder on Ingredients.StoreSectionId = SectionOrder.StoreSectionId
+				left join ShoppingLists on ShoppingLists.ShoppingListId = ${req.body.ShoppingListId}
+				where SectionOrder.StoreId = ${req.body.StoreId}
+				group by Ingredients.IngredientName
+				);`;
 
 			handleQuery(sql, res);
 		} else {
@@ -828,6 +1174,30 @@ app.delete('/listcontent', authenticate.authenticateToken, (req, res) => {
 
 // patch requests
 
+// users
+
+app.patch('/user', authenticate.authenticateToken, async (req, res) => {
+	let updates = '';
+	if (req.body.Pass) {
+		const newHashedPassword = await bcrypt.hash(req.body.Pass, 10);
+		updates = updates.concat(` Pass = "${newHashedPassword}",`);
+	}
+	if (req.body.HouseHold) {
+		updates = updates.concat(` HouseHold = ${req.body.HouseHold},`);
+	}
+	console.log(updates);
+	if (updates === '') {
+		res.sendStatus(400);
+	} else {
+		const newUpdates = updates.slice(0, updates.length - 1);
+		let sql = `update Users
+        set ${newUpdates}
+        where Username = "${req.user.user}";`;
+		console.log(sql);
+		handleQuery(sql, res);
+	}
+});
+
 // recipes
 
 app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
@@ -854,6 +1224,9 @@ app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
 		}
 		if (req.body.RegisterDate) {
 			updates = updates.concat(` RegisterDate = "${req.body.RegisterDate}",`);
+		}
+		if (req.body.Public) {
+			updates = updates.concat(` Public = ${req.body.Public},`);
 		}
 		console.log(updates);
 		if (updates === '') {
@@ -883,7 +1256,10 @@ app.patch('/ingredient', authenticate.authenticateToken, (req, res) => {
 			);
 		}
 		if (req.body.MeasurementId) {
-			updates = updates.concat(` MeasurementId = "${req.body.MeasurementId}",`);
+			updates = updates.concat(` MeasurementId = ${req.body.MeasurementId},`);
+		}
+		if (req.body.StoreSectionId) {
+			updates = updates.concat(` StoreSectionId = ${req.body.StoreSectionId},`);
 		}
 		if (updates === '') {
 			res.sendStatus(400);
@@ -1036,17 +1412,16 @@ app.patch('/listcontent', authenticate.authenticateToken, (req, res) => {
 				` QuantityAvailable = ${req.body.QuantityAvailable},`
 			);
 		}
-		if (req.body.Picked) {
+		if (req.body.Picked === 1 || req.body.Picked === 0) {
 			updates = updates.concat(` Picked = ${req.body.Picked},`);
 		}
 		if (updates === '') {
 			res.sendStatus(400);
 		} else {
 			const newUpdates = updates.slice(0, updates.length - 1);
-			let sql = `update ShoppingLists
+			let sql = `update ListContents
       set ${newUpdates}
-      where ShoppingListId = ${req.body.ShoppingListId} 
-      and IngredientId = ${req.body.IngredientId};`;
+      where ShoppingListId = ${req.body.ShoppingListId} and IngredientId = ${req.body.IngredientId};`;
 			handleQuery(sql, res);
 		}
 	} else {
