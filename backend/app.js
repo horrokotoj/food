@@ -408,7 +408,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 							Recipes.RecipeImage,  
 							Recipes.RecipePortions,  
 							Recipes.Public,
-							CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate, 
+							Recipes.RegisterDate as RegisterDate, 
 							Users.UserName as RecipeOwner, 
 							Users.HouseHoldId as HouseHoldId 
 						from Recipes left join 
@@ -424,7 +424,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 });
 
 app.get('/recipe/:id', authenticate.authenticateToken, (req, res) => {
-	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
+	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, Recipes.RegisterDate as RegisterDate 
     from Recipes
     left join Users on Recipes.RecipeOwner = Users.UserId
     where RecipeId = ${req.params.id};`;
@@ -488,7 +488,7 @@ app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 	let sql = `select distinct RecipeCalendar.RecipeCalendarId, 
 							RecipeCalendar.RecipeId, 
 							Users.UserName as IssuedUser, 
-							CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+							RecipeCalendar.RecipeDate as RecipeDate, 
 							RecipeCalendar.Portions, 
 							Recipes.RecipeName, 
 							Recipes.RecipeDesc, 
@@ -509,7 +509,7 @@ app.get(
 	'/recipecalendar/:year/:month/:day',
 	authenticate.authenticateToken,
 	(req, res) => {
-		let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
+		let sql = `select RecipeCalendarId, RecipeDate as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
 		handleQuery(sql, res);
 	}
 );
@@ -520,7 +520,7 @@ app.get(
 	(req, res) => {
 		if (req.body.startDate && req.body.endDate) {
 			let sql = `
-			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
+			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
 	from RecipeCalendar left join 
 	Users on RecipeCalendar.UserId = Users.UserId 
 	join InHouseHold 
@@ -562,7 +562,7 @@ app.get(
 			from (
 			select distinct RecipeCalendar.RecipeCalendarId, 
 			Users.UserName as IssuedUser, 
-			Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+			Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
 			RecipeCalendar.RecipeId, 
 			RecipeCalendar.Portions as CalendarPortions, 
 			Recipes.RecipePortions as RecipePortions
@@ -892,7 +892,7 @@ app.post(
 													from (
 													select distinct RecipeCalendar.RecipeCalendarId,
 													Users.UserName as IssuedUser,
-													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
 													RecipeCalendar.RecipeId,
 													RecipeCalendar.Portions as CalendarPortions,
 													Recipes.RecipePortions as RecipePortions
@@ -922,7 +922,7 @@ app.post(
 													from (
 													select distinct RecipeCalendar.RecipeCalendarId,
 													Users.UserName as IssuedUser,
-													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
 													RecipeCalendar.RecipeId,
 													RecipeCalendar.Portions as CalendarPortions,
 													Recipes.RecipePortions as RecipePortions
@@ -984,7 +984,7 @@ app.post(
 				from (
 				select distinct RecipeCalendar.RecipeCalendarId, 
 				Users.UserName as IssuedUser, 
-				Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+				Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
 				RecipeCalendar.RecipeId, 
 				RecipeCalendar.Portions as CalendarPortions, 
 				Recipes.RecipePortions as RecipePortions
