@@ -176,8 +176,8 @@ CREATE TABLE ListContents
     Quantity FLOAT NOT NULL,
     QuantityAvailable FLOAT default 0,
     Picked BOOLEAN NOT NULL default false,
-    MeasurementId BIGINT UNSIGNED NOT NULL,
-    FOREIGN KEY (MeasurementId) REFERENCES Measurements (MeasurementId)
+    MeasurementName CHAR(255) NOT NULL, 
+    FOREIGN KEY (MeasurementName) REFERENCES Measurements (MeasurementName)
 );
 
 CREATE TABLE TickedSteps
