@@ -408,7 +408,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 							Recipes.RecipeImage,  
 							Recipes.RecipePortions,  
 							Recipes.Public,
-							CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate, 
+							Recipes.RegisterDate as RegisterDate, 
 							Users.UserName as RecipeOwner, 
 							Users.HouseHoldId as HouseHoldId 
 						from Recipes left join 
@@ -424,7 +424,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 });
 
 app.get('/recipe/:id', authenticate.authenticateToken, (req, res) => {
-	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, CONVERT_TZ(Recipes.RegisterDate, "GMT", 'Europe/Stockholm') as RegisterDate 
+	let sql = `select Recipes.RecipeId, Recipes.RecipeName, Recipes.RecipeDesc, Recipes.RecipeImage, Recipes.RecipePortions, Users.UserName as RecipeOwner, Recipes.RegisterDate as RegisterDate 
     from Recipes
     left join Users on Recipes.RecipeOwner = Users.UserId
     where RecipeId = ${req.params.id};`;
@@ -488,7 +488,7 @@ app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 	let sql = `select distinct RecipeCalendar.RecipeCalendarId, 
 							RecipeCalendar.RecipeId, 
 							Users.UserName as IssuedUser, 
-							CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+							RecipeCalendar.RecipeDate as RecipeDate, 
 							RecipeCalendar.Portions, 
 							Recipes.RecipeName, 
 							Recipes.RecipeDesc, 
@@ -509,7 +509,7 @@ app.get(
 	'/recipecalendar/:year/:month/:day',
 	authenticate.authenticateToken,
 	(req, res) => {
-		let sql = `select RecipeCalendarId, CONVERT_TZ(RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
+		let sql = `select RecipeCalendarId, RecipeDate as RecipeDate, RecipeId, Portions from RecipeCalendar where RecipeDate = "${req.params.year}-${req.params.month}-${req.params.day}"`;
 		handleQuery(sql, res);
 	}
 );
@@ -520,7 +520,7 @@ app.get(
 	(req, res) => {
 		if (req.body.startDate && req.body.endDate) {
 			let sql = `
-			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
+			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
 	from RecipeCalendar left join 
 	Users on RecipeCalendar.UserId = Users.UserId 
 	join InHouseHold 
@@ -542,7 +542,7 @@ app.get(
 // shoppinglists
 
 app.get('/shoppinglists', authenticate.authenticateToken, (req, res) => {
-	let sql = `select distinct ShoppingLists.ShoppingListId, ShoppingLists.ShoppingListName, ShoppingLists.StartDate, ShoppingLists.EndDate, Users.UserName as IssuedUser from ShoppingLists 
+	let sql = `select distinct ShoppingLists.ShoppingListId, ShoppingLists.ShoppingListName, ShoppingLists.StartDate, ShoppingLists.EndDate, Users.UserName as IssuedUser, ShoppingLists.StoreId from ShoppingLists 
 	left join Users on ShoppingLists.UserId = Users.UserId
 	join InHouseHold
 	left join Users as Users2 on InHouseHold.UserId = Users2.UserId
@@ -562,7 +562,7 @@ app.get(
 			from (
 			select distinct RecipeCalendar.RecipeCalendarId, 
 			Users.UserName as IssuedUser, 
-			Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+			Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
 			RecipeCalendar.RecipeId, 
 			RecipeCalendar.Portions as CalendarPortions, 
 			Recipes.RecipePortions as RecipePortions
@@ -597,6 +597,13 @@ app.get('/listcontents', authenticate.authenticateToken, (req, res) => {
 
 app.get('/listcontent/:id', authenticate.authenticateToken, (req, res) => {
 	let sql = `select * from ListContents
+    where ShoppingListId = ${req.params.id};`;
+	handleQuery(sql, res);
+});
+
+app.get('/household', authenticate.authenticateToken, (req, res) => {
+	let user = req.user;
+	let sql = `select  from ListContents
     where ShoppingListId = ${req.params.id};`;
 	handleQuery(sql, res);
 });
@@ -816,7 +823,12 @@ app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 app.post('/listcontent', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
 	let sql;
-	if (req.body.ShoppingListId && req.body.IngredientId && req.body.Quantity) {
+	if (
+		req.body.ShoppingListId &&
+		req.body.IngredientId &&
+		req.body.Quantity &&
+		req.body.MeasurementName
+	) {
 		sql = `select Quantity from ListContents where ShoppingListId = ${req.body.ShoppingListId} and IngredientId = ${req.body.IngredientId};`;
 		db.query(sql, (err, rows) => {
 			if (err) {
@@ -830,12 +842,37 @@ app.post('/listcontent', authenticate.authenticateToken, (req, res) => {
             where ShoppingListId = ${req.body.ShoppingListId} and IngredientId = ${req.body.IngredientId}`;
 					handleQuery(sql, res);
 				} else {
-					sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, Picked)
-            values (${req.body.ShoppingListId}, 
-            ${req.body.IngredientId}, 
-            (select IngredientName from Ingredients where IngredientId = ${req.body.IngredientId}), 
-            ${req.body.Quantity}, 
-            false);`;
+					if (req.body.StoreId) {
+						sql = `insert into ListContents 
+						(ShoppingListId, 
+							IngredientId, 
+							Indexx, 
+							IngredientName, 
+							Quantity, 
+							MeasurementName)
+							values 
+							(${req.body.ShoppingListId}, 
+							${req.body.IngredientId}, 
+							(select SectionOrder.OrderOfSection from Ingredients left join SectionOrder on Ingredients.StoreSectionId = SectionOrder.StoresectionId where Ingredients.IngredientId = ${req.body.IngredientId} and SectionOrder.StoreId = ${req.body.StoreId}),
+							(select IngredientName from Ingredients where IngredientId = ${req.body.IngredientId}), 
+							${req.body.Quantity}, 
+							"${req.body.MeasurementName}");`;
+					} else {
+						sql = `insert into ListContents 
+						(ShoppingListId, 
+							IngredientId, 
+							Indexx, 
+							IngredientName, 
+							Quantity, 
+							MeasurementName)
+							values 
+							(${req.body.ShoppingListId}, 
+							${req.body.IngredientId}, 
+							0,
+							(select IngredientName from Ingredients where IngredientId = ${req.body.IngredientId}), 
+							${req.body.Quantity}, 
+							"${req.body.MeasurementName}");`;
+					}
 
 					handleQuery(sql, res);
 				}
@@ -852,7 +889,7 @@ app.post(
 	(req, res) => {
 		console.log(req.body);
 		if (req.body.startDate && req.body.endDate) {
-			let sqlUserId = `select UserId from Users where UserName = "${req.user.user}";`;
+			let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users left join HouseHolds on Users.HouseHoldId = HouseHolds.HouseHoldId where UserName = "${req.user.user}";`;
 			db.query(sqlUserId, (err, rows) => {
 				if (err) {
 					console.log(err);
@@ -860,28 +897,19 @@ app.post(
 				} else {
 					if (rows.length === 1) {
 						let UserId = rows[0].UserId;
-						let sqlList = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate, UserId)
+						let StoreId = rows[0].DefaultStore;
+						let sqlList = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate, UserId, StoreId)
 							values
-							("${req.body.startDate} - ${req.body.endDate}", "${req.body.startDate}", "${req.body.endDate}", ${UserId});`;
+							("${req.body.startDate} - ${req.body.endDate}", "${req.body.startDate}", "${req.body.endDate}", ${UserId}, ${StoreId});`;
 						db.query(sqlList, (err, rows) => {
 							if (err) {
 								console.log(err);
 								res.sendStatus(500);
 							} else {
 								let ShoppingListId = rows.insertId;
-								let sqlStoreId = `select DefaultStore from Users
-									left join InHouseHold on (Users.UserId = InHouseHold.UserId)
-									left join HouseHolds on (InHouseHold.HouseHoldId = HouseHolds.HouseHoldId)
-									where Users.UserName = "${req.user.user}";`;
-								db.query(sqlStoreId, (err, rows) => {
-									if (err) {
-										console.log(err);
-										res.sendStatus(500);
-									} else if (rows.length == 1) {
-										let sql;
-										if (rows[0].DefaultStore) {
-											let StoreId = rows[0].DefaultStore;
-											sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, MeasurementName, Indexx)
+								let sql;
+								if (StoreId) {
+									sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, MeasurementName, Indexx)
 													(select
 													ShoppingLists.ShoppingListId,
 													Ingredients.IngredientId,
@@ -892,7 +920,7 @@ app.post(
 													from (
 													select distinct RecipeCalendar.RecipeCalendarId,
 													Users.UserName as IssuedUser,
-													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
 													RecipeCalendar.RecipeId,
 													RecipeCalendar.Portions as CalendarPortions,
 													Recipes.RecipePortions as RecipePortions
@@ -914,15 +942,15 @@ app.post(
 													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
 													where SectionOrder.StoreId = ${StoreId}
 													group by Ingredients.IngredientName);`;
-										} else {
-											sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity)
+								} else {
+									sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity)
 													(
 													select
 													ShoppingLists.ShoppingListId, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity
 													from (
 													select distinct RecipeCalendar.RecipeCalendarId,
 													Users.UserName as IssuedUser,
-													Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate,
+													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
 													RecipeCalendar.RecipeId,
 													RecipeCalendar.Portions as CalendarPortions,
 													Recipes.RecipePortions as RecipePortions
@@ -942,12 +970,8 @@ app.post(
 													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
 													group by Ingredients.IngredientName
 													);`;
-										}
-										handleQuery(sql, res);
-									} else {
-										res.sendStatus(500);
-									}
-								});
+								}
+								handleQuery(sql, res);
 							}
 						});
 					} else {
@@ -984,7 +1008,7 @@ app.post(
 				from (
 				select distinct RecipeCalendar.RecipeCalendarId, 
 				Users.UserName as IssuedUser, 
-				Users.UserId, CONVERT_TZ(RecipeCalendar.RecipeDate, "GMT", 'Europe/Stockholm') as RecipeDate, 
+				Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
 				RecipeCalendar.RecipeId, 
 				RecipeCalendar.Portions as CalendarPortions, 
 				Recipes.RecipePortions as RecipePortions
@@ -1201,44 +1225,80 @@ app.patch('/user', authenticate.authenticateToken, async (req, res) => {
 // recipes
 
 app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
+	console.log(req.body);
 	if (req.body.RecipeId) {
-		let updates = '';
-		if (req.body.RecipeName) {
-			updates = updates.concat(` RecipeName = "${req.body.RecipeName}",`);
-		}
-		if (req.body.RecipeDesc) {
-			console.log('here');
-			updates = updates.concat(` RecipeDesc = "${req.body.RecipeDesc}",`);
-		}
-		if (req.body.RecipeSteps) {
-			updates = updates.concat(` RecipeSteps = "${req.body.RecipeSteps}",`);
-		}
-		if (req.body.RecipeImage) {
-			updates = updates.concat(` RecipeImage = "${req.body.RecipeImage}",`);
-		}
-		if (req.body.RecipePortions) {
-			updates = updates.concat(` RecipePortions = ${req.body.RecipePortions},`);
-		}
-		if (req.body.RecipeOwner) {
-			updates = updates.concat(` RecipeOwner = "${req.body.RecipeOwner}",`);
-		}
-		if (req.body.RegisterDate) {
-			updates = updates.concat(` RegisterDate = "${req.body.RegisterDate}",`);
-		}
-		if (req.body.Public) {
-			updates = updates.concat(` Public = ${req.body.Public},`);
-		}
-		console.log(updates);
-		if (updates === '') {
-			res.sendStatus(400);
-		} else {
-			const newUpdates = updates.slice(0, updates.length - 1);
-			let sql = `update Recipes
-        set ${newUpdates}
-        where RecipeId = ${req.body.RecipeId};`;
-			console.log(sql);
-			handleQuery(sql, res);
-		}
+		let validateSql = `select distinct Recipes.RecipeId
+		from Recipes left join 
+			Users on Recipes.RecipeOwner = Users.UserId join 
+			InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
+		where
+			Recipes.RecipeId = ${req.body.RecipeId}
+		and
+			(Recipes.Public = true
+		or
+			(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
+		or 
+			Users.UserName = "${req.user.user}");`;
+		db.query(validateSql, (err, rows) => {
+			if (err) {
+				console.log(err);
+				res.sendStatus(handleErrorResponse(err));
+			} else {
+				console.log('here');
+				console.log(rows);
+				if (rows.length > 0 && rows[0].RecipeId == req.body.RecipeId) {
+					let updates = '';
+					if (req.body.RecipeName) {
+						updates = updates.concat(` RecipeName = "${req.body.RecipeName}",`);
+					}
+					if (req.body.RecipeDesc) {
+						console.log('here');
+						updates = updates.concat(` RecipeDesc = "${req.body.RecipeDesc}",`);
+					}
+					if (req.body.RecipeSteps) {
+						updates = updates.concat(
+							` RecipeSteps = "${req.body.RecipeSteps}",`
+						);
+					}
+					if (req.body.RecipeImage) {
+						updates = updates.concat(
+							` RecipeImage = "${req.body.RecipeImage}",`
+						);
+					}
+					if (req.body.RecipePortions) {
+						updates = updates.concat(
+							` RecipePortions = ${req.body.RecipePortions},`
+						);
+					}
+					if (req.body.RecipeOwner) {
+						updates = updates.concat(
+							` RecipeOwner = "${req.body.RecipeOwner}",`
+						);
+					}
+					if (req.body.RegisterDate) {
+						updates = updates.concat(
+							` RegisterDate = "${req.body.RegisterDate}",`
+						);
+					}
+					if (req.body.Public === true || req.body.Public === false) {
+						updates = updates.concat(` Public = ${req.body.Public},`);
+					}
+					console.log(updates);
+					if (updates === '') {
+						res.sendStatus(400);
+					} else {
+						const newUpdates = updates.slice(0, updates.length - 1);
+						let sql = `update Recipes
+							set ${newUpdates}
+							where RecipeId = ${req.body.RecipeId};`;
+						console.log(sql);
+						handleQuery(sql, res);
+					}
+				} else {
+					res.sendStatus(401);
+				}
+			}
+		});
 	} else {
 		res.sendStatus(400);
 	}

@@ -157,7 +157,9 @@ CREATE TABLE ShoppingLists
     StartDate DATE,
     EndDate DATE,
     UserId BIGINT UNSIGNED NOT NULL,
-    FOREIGN KEY (UserId) REFERENCES Users (UserId)
+    FOREIGN KEY (UserId) REFERENCES Users (UserId),
+    StoreId BIGINT UNSIGNED,
+    FOREIGN KEY (StoreId) REFERENCES Stores (StoreId)
 );
 
 CREATE TABLE ListContents
@@ -176,8 +178,8 @@ CREATE TABLE ListContents
     Quantity FLOAT NOT NULL,
     QuantityAvailable FLOAT default 0,
     Picked BOOLEAN NOT NULL default false,
-    MeasurementId BIGINT UNSIGNED NOT NULL,
-    FOREIGN KEY (MeasurementId) REFERENCES Measurements (MeasurementId)
+    MeasurementName CHAR(255) NOT NULL, 
+    FOREIGN KEY (MeasurementName) REFERENCES Measurements (MeasurementName)
 );
 
 CREATE TABLE TickedSteps
