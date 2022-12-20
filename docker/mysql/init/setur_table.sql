@@ -157,7 +157,9 @@ CREATE TABLE ShoppingLists
     StartDate DATE,
     EndDate DATE,
     UserId BIGINT UNSIGNED NOT NULL,
-    FOREIGN KEY (UserId) REFERENCES Users (UserId)
+    FOREIGN KEY (UserId) REFERENCES Users (UserId),
+    StoreId BIGINT UNSIGNED,
+    FOREIGN KEY (StoreId) REFERENCES Stores (StoreId)
 );
 
 CREATE TABLE ListContents
