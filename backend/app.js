@@ -225,77 +225,6 @@ app.post('/user', (req, res) => {
 	}
 });
 
-// app.post('/login', (req, res) => {
-// 	console.log(req.body);
-// 	if (req.body.username && req.body.password) {
-// 		const username = req.body.username;
-// 		const password = req.body.password;
-// 		console.log(password.length);
-// 		let sql1 = `select UserEmail, Pass, Verified, HouseHoldId from Users
-//       where UserName = "${username}";`;
-// 		db.query(sql1, async (err, rows) => {
-// 			if (err) {
-// 				res.sendStatus(500);
-// 			} else {
-// 				if (rows.length === 1) {
-// 					if (rows[0].Verified) {
-// 						const hashedPassword = rows[0].Pass;
-// 						const email = rows[0].UserEmail;
-// 						const houseHoldId = rows[0].HouseHoldId;
-// 						try {
-// 							if (await bcrypt.compare(password, hashedPassword)) {
-// 								const user = {
-// 									user: username,
-// 									email: email,
-// 									houseHoldId: houseHoldId,
-// 								};
-// 								const accessToken = generateAccessToken(user);
-// 								const refreshToken = generateRefreshToken(user);
-// 								let sql2 = `update Users
-// 														set Token = "${refreshToken}"
-// 														where UserName = "${username}";`;
-// 								db.query(sql2, (err, rows) => {
-// 									if (err) {
-// 										console.log(err);
-// 										console.log('Unable to update Token');
-// 										res.sendStatus(500);
-// 									} else {
-// 										if (rows.affectedRows === 1) {
-// 											console.log('Successfully updated Token');
-// 											res.json({
-// 												accessToken: accessToken,
-// 												refreshToken: refreshToken,
-// 												user: user,
-// 											});
-// 										} else {
-// 											res.sendStatus(500);
-// 											console.log('Unable to update Token');
-// 										}
-// 									}
-// 								});
-// 							} else {
-// 								res.sendStatus(401);
-// 								console.log('Invalid password');
-// 							}
-// 						} catch (err) {
-// 							console.log(err);
-// 							res.sendStatus(500);
-// 						}
-// 					} else {
-// 						res.sendStatus(401);
-// 					}
-// 				} else {
-// 					res.sendStatus(401);
-// 					console.log('Invalid username');
-// 				}
-// 			}
-// 		});
-// 	} else {
-// 		res.sendStatus(400);
-// 		return;
-// 	}
-// });
-
 app.post('/login', (req, res) => {
 	console.log(req.body);
 	if (req.body.username && req.body.password) {
@@ -322,10 +251,27 @@ app.post('/login', (req, res) => {
 								};
 								const accessToken = generateAccessToken(user);
 								const refreshToken = generateRefreshToken(user);
-								res.json({
-									accessToken: accessToken,
-									refreshToken: refreshToken,
-									user: user,
+								let sql2 = `update Users
+														set Token = "${refreshToken}"
+														where UserName = "${username}";`;
+								db.query(sql2, (err, rows) => {
+									if (err) {
+										console.log(err);
+										console.log('Unable to update Token');
+										res.sendStatus(500);
+									} else {
+										if (rows.affectedRows === 1) {
+											console.log('Successfully updated Token');
+											res.json({
+												accessToken: accessToken,
+												refreshToken: refreshToken,
+												user: user,
+											});
+										} else {
+											res.sendStatus(500);
+											console.log('Unable to update Token');
+										}
+									}
 								});
 							} else {
 								res.sendStatus(401);
@@ -370,36 +316,25 @@ app.post('/logout', authenticate.authenticateToken, (req, res) => {
 
 app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
 	const username = req.user.user;
-	const user = { user: username };
-	const accessToken = generateAccessToken(user);
-	if (accessToken) {
-		console.log('New accessToken');
-		console.log(accessToken);
-		res.json({ token: accessToken });
-	}
+	const authHeader = req.headers['authorization'];
+	const token = authHeader.split(' ')[1];
+	let sql = `select Token from Users where UserName = "${username}"`;
+	db.query(sql, (err, rows) => {
+		if (err) {
+			console.log(err);
+			res.sendStatus(500);
+		} else if (rows.length === 1 && rows[0].Token === token) {
+			const user = { user: username };
+			const accessToken = generateAccessToken(user);
+			if (accessToken) {
+				console.log(accessToken);
+				res.json({ token: accessToken });
+			}
+		} else {
+			res.sendStatus(500);
+		}
+	});
 });
-
-// app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
-// 	const username = req.user.user;
-// 	const authHeader = req.headers['authorization'];
-// 	const token = authHeader.split(' ')[1];
-// 	let sql = `select Token from Users where UserName = "${username}"`;
-// 	db.query(sql, (err, rows) => {
-// 		if (err) {
-// 			console.log(err);
-// 			res.sendStatus(500);
-// 		} else if (rows.length === 1 && rows[0].Token === token) {
-// 			const user = { user: username };
-// 			const accessToken = generateAccessToken(user);
-// 			if (accessToken) {
-// 				console.log(accessToken);
-// 				res.json({ token: accessToken });
-// 			}
-// 		} else {
-// 			res.sendStatus(500);
-// 		}
-// 	});
-// });
 
 app.get('/verify/:id', (req, res) => {
 	const token = req.params.id;
