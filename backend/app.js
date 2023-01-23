@@ -17,7 +17,7 @@ const port = process.env.APP_PORT || 4000;
 app.use(express.json());
 
 function generateAccessToken(user) {
-	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15s' });
+	return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 }
 
 function generateRefreshToken(user) {
@@ -327,6 +327,7 @@ app.post('/token', authenticate.authenticateRefreshToken, (req, res) => {
 			const user = { user: username };
 			const accessToken = generateAccessToken(user);
 			if (accessToken) {
+				console.log('New accessToken');
 				console.log(accessToken);
 				res.json({ token: accessToken });
 			}
