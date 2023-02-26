@@ -100,7 +100,7 @@ async function verificationMail({ username, email }) {
 	let emailToken = generateEmailToken(user);
 	console.log('generated email token');
 	console.log(emailToken);
-	let verifyUrl = `http://${process.env.URL}/verify/${emailToken}`;
+	let verifyUrl = `${process.env.URL}/verify/${emailToken}`;
 
 	let mailOptions = {
 		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
