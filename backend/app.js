@@ -794,28 +794,45 @@ app.post('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 
 app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
-	let sql;
-	if (req.body.ShoppingListName) {
-		if (req.body.StartDate && req.body.EndDate) {
-			sql = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate)
-        values 
-        ("${req.body.ShoppingListName}",
-        "${req.body.StartDate}",
-        "${req.body.EndDate}");`;
+	let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users left join HouseHolds on Users.HouseHoldId = HouseHolds.HouseHoldId where UserName = "${req.user.user}";`;
+	db.query(sqlUserId, (err, rows) => {
+		if (err) {
+			console.log(err);
+			res.sendStatus(500);
 		} else {
-			sql = `insert into ShoppingLists (ShoppingListName)
-        values 
-        ("${req.body.ShoppingListName}");`;
+			//
+			if (rows.length === 1) {
+				let UserId = rows[0].UserId;
+				let StoreId = rows[0].DefaultStore;
+				let sql;
+				if (req.body.ShoppingListName) {
+					if (req.body.StartDate && req.body.EndDate) {
+						sql = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate, UserId, StoreId)
+								values 
+								("${req.body.ShoppingListName}",
+								"${req.body.StartDate}",
+								"${req.body.EndDate}",
+								${UserId}, 
+								${StoreId});`;
+					} else {
+						sql = `insert into ShoppingLists (ShoppingListName, UserId, StoreId)
+								values 
+								("${req.body.ShoppingListName}, ${UserId}, ${StoreId}");`;
+					}
+				} else if (req.body.StartDate && req.body.EndDate) {
+					sql = `insert into ShoppingLists (StartDate, EndDate, UserId, StoreId)
+							values 
+							("${req.body.StartDate}",
+							"${req.body.EndDate},
+							${UserId}, 
+							${StoreId}");`;
+				} else {
+					res.sendStatus(400);
+				}
+				handleQuery(sql, res);
+			}
 		}
-	} else if (req.body.StartDate && req.body.EndDate) {
-		sql = `insert into ShoppingLists (StartDate ,EndDate)
-      values 
-      ("${req.body.StartDate}",
-      "${req.body.EndDate}");`;
-	} else {
-		res.sendStatus(400);
-	}
-	handleQuery(sql, res);
+	});
 });
 
 // listcontents
