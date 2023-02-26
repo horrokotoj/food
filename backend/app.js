@@ -132,19 +132,14 @@ async function verificationMail({ username, email }) {
 }
 
 // Create connection to database
-const db = mysql.createConnection({
+const db = mysql.createPool({
 	host: process.env.DB_HOST,
 	user: process.env.DB_USER,
 	password: process.env.DB_PASS,
 	database: process.env.DB,
-});
-
-// Connect to db
-db.connect((err) => {
-	if (err) {
-		throw err;
-	}
-	console.log('Connected to db');
+	waitForConnections: true,
+	connectionLimit: 10,
+	queueLimit: 0,
 });
 
 // Auth
