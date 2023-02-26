@@ -94,13 +94,13 @@ async function verificationMail({ username, email }) {
 			rejectUnauthorized: false,
 		},
 	});
-	console.log('before email token');
-
+	console.log(username);
 	let user = { user: username };
+	console.log('before email token');
 	let emailToken = generateEmailToken(user);
 	console.log('generated email token');
 	console.log(emailToken);
-	let verifyUrl = `http://${process.env.URL}:${process.env.APP_PORT}/verify/${emailToken}`;
+	let verifyUrl = `http://${process.env.URL}/verify/${emailToken}`;
 
 	let mailOptions = {
 		from: `"food verifier" <${process.env.VER_EMAIL}>`, // sender address
