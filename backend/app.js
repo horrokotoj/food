@@ -817,7 +817,7 @@ app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 					} else {
 						sql = `insert into ShoppingLists (ShoppingListName, UserId, StoreId)
 								values 
-								("${req.body.ShoppingListName}, ${UserId}, ${StoreId}");`;
+								("${req.body.ShoppingListName}", ${UserId}, ${StoreId});`;
 					}
 				} else if (req.body.StartDate && req.body.EndDate) {
 					sql = `insert into ShoppingLists (StartDate, EndDate, UserId, StoreId)
