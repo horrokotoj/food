@@ -226,7 +226,7 @@ app.post('/login', (req, res) => {
 		const username = req.body.username;
 		const password = req.body.password;
 		console.log(password.length);
-		let sql1 = `select UserEmail, Pass, Verified, HouseHoldId from Users
+		let sql1 = `select UserEmail, Pass, Verified from Users
       where UserName = "${username}";`;
 		db.query(sql1, async (err, rows) => {
 			if (err) {
@@ -236,13 +236,11 @@ app.post('/login', (req, res) => {
 					if (rows[0].Verified) {
 						const hashedPassword = rows[0].Pass;
 						const email = rows[0].UserEmail;
-						const houseHoldId = rows[0].HouseHoldId;
 						try {
 							if (await bcrypt.compare(password, hashedPassword)) {
 								const user = {
 									user: username,
 									email: email,
-									houseHoldId: houseHoldId,
 								};
 								const accessToken = generateAccessToken(user);
 								const refreshToken = generateRefreshToken(user);
@@ -403,23 +401,24 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 	console.log(req.user);
 
 	let sql = `select distinct Recipes.RecipeId, 
-							Recipes.RecipeName, 
-							Recipes.RecipeDesc, 
-							Recipes.RecipeImage,  
-							Recipes.RecipePortions,  
-							Recipes.Public,
-							Recipes.RegisterDate as RegisterDate, 
-							Users.UserName as RecipeOwner, 
-							Users.HouseHoldId as HouseHoldId 
-						from Recipes left join 
-							Users on Recipes.RecipeOwner = Users.UserId join 
-							InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-						where 
-							Recipes.Public = true
-						or
-							(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-						or 
-							Users.UserName = "${req.user.user}";`;
+								Recipes.RecipeName, 
+								Recipes.RecipeDesc, 
+								Recipes.RecipeImage,  
+								Recipes.RecipePortions,  
+								Recipes.Public,
+								Recipes.RegisterDate as RegisterDate, 
+								Users.UserName as RecipeOwner, 
+								InHouseHold.HouseHoldId as HouseHoldId 
+							from Recipes 
+							left join Users on Recipes.RecipeOwner = Users.UserId 
+								left join InHouseHold on Users.UserId = InHouseHold.UserId
+							where 
+								Recipes.Public = true
+							or 
+							InHouseHold.HouseHoldId = (
+							select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+							)
+							or Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
 });
 
@@ -485,7 +484,7 @@ app.get('/storesections', authenticate.authenticateToken, (req, res) => {
 // recipecalendar
 
 app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
-	let sql = `select distinct RecipeCalendar.RecipeCalendarId, 
+	let sql = `select RecipeCalendar.RecipeCalendarId, 
 							RecipeCalendar.RecipeId, 
 							Users.UserName as IssuedUser, 
 							RecipeCalendar.RecipeDate as RecipeDate, 
@@ -493,15 +492,13 @@ app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 							Recipes.RecipeName, 
 							Recipes.RecipeDesc, 
 							Recipes.RecipeImage
-						from RecipeCalendar left join 
-							Users on RecipeCalendar.UserId = Users.UserId 
-							join InHouseHold 
-							left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-							left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-						where 
-							(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-						or 
-							Users.UserName = "${req.user.user}";`;
+						from RecipeCalendar 
+						left join Users on RecipeCalendar.UserId = Users.UserId 
+						left join InHouseHold on Users.UserId = InHouseHold.UserId 
+						left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+						where Users.UserName = "${req.user.user}"
+						or InHouseHold.HouseHoldId = (
+						select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}");`;
 	handleQuery(sql, res);
 });
 
@@ -520,17 +517,23 @@ app.get(
 	(req, res) => {
 		if (req.body.startDate && req.body.endDate) {
 			let sql = `
-			select distinct RecipeCalendar.RecipeCalendarId, Users.UserName as IssuedUser, Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, RecipeCalendar.RecipeId, RecipeCalendar.Portions
-	from RecipeCalendar left join 
-	Users on RecipeCalendar.UserId = Users.UserId 
-	join InHouseHold 
-	left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-	left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-	where 
-	((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-	or 
-	Users.UserName = "${req.user.user}") and 
-	(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}");
+			select RecipeCalendar.RecipeCalendarId, 
+				RecipeCalendar.RecipeId, 
+				Users.UserName as IssuedUser, 
+				RecipeCalendar.RecipeDate as RecipeDate, 
+				RecipeCalendar.Portions, 
+				Recipes.RecipeName, 
+				Recipes.RecipeDesc, 
+				Recipes.RecipeImage
+			from RecipeCalendar 
+			left join Users on RecipeCalendar.UserId = Users.UserId 
+			left join InHouseHold on Users.UserId = InHouseHold.UserId 
+			left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+			where (Users.UserName = "${req.user.user}"
+			or InHouseHold.HouseHoldId = (
+			select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+			))
+		and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}");
 			`;
 			handleQuery(sql, res);
 		} else {
@@ -542,13 +545,19 @@ app.get(
 // shoppinglists
 
 app.get('/shoppinglists', authenticate.authenticateToken, (req, res) => {
-	let sql = `select distinct ShoppingLists.ShoppingListId, ShoppingLists.ShoppingListName, ShoppingLists.StartDate, ShoppingLists.EndDate, Users.UserName as IssuedUser, ShoppingLists.StoreId from ShoppingLists 
-	left join Users on ShoppingLists.UserId = Users.UserId
-	join InHouseHold
-	left join Users as Users2 on InHouseHold.UserId = Users2.UserId
-	where (Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-	or
-	Users.UserName = "${req.user.user}";`;
+	let sql = `select ShoppingLists.ShoppingListId, 
+	ShoppingLists.ShoppingListName, 
+	ShoppingLists.StartDate, 
+	ShoppingLists.EndDate, 
+	Users.UserName as IssuedUser, 
+	ShoppingLists.StoreId from ShoppingLists 
+		left join Users on ShoppingLists.UserId = Users.UserId
+		left join InHouseHold on Users.UserId = InHouseHold.UserId
+		where (
+		select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+		)
+		or
+		Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
 });
 
@@ -560,22 +569,22 @@ app.get(
 			let sql = `select 
 			Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as FinalQuantity
 			from (
-			select distinct RecipeCalendar.RecipeCalendarId, 
+			select RecipeCalendar.RecipeCalendarId, 
 			Users.UserName as IssuedUser, 
-			Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
+			Users.UserId, 
+			RecipeCalendar.RecipeDate as RecipeDate, 
 			RecipeCalendar.RecipeId, 
 			RecipeCalendar.Portions as CalendarPortions, 
 			Recipes.RecipePortions as RecipePortions
-				from RecipeCalendar left join 
-				Users on RecipeCalendar.UserId = Users.UserId 
-				join InHouseHold 
-				left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-				left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-				where 
-				((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-				or 
-				Users.UserName = "${req.user.user}") and 
-				(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
+					from RecipeCalendar 
+					left join Users on RecipeCalendar.UserId = Users.UserId 
+					left join InHouseHold on Users.UserId = InHouseHold.UserId 
+					left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+					where (Users.UserName = "${req.user.user}"
+					or InHouseHold.HouseHoldId = (
+					select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+					))
+				and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
 			) as RecipeCalendar
 			left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
 			left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
@@ -601,10 +610,17 @@ app.get('/listcontent/:id', authenticate.authenticateToken, (req, res) => {
 	handleQuery(sql, res);
 });
 
+// households
+
 app.get('/household', authenticate.authenticateToken, (req, res) => {
 	let user = req.user;
-	let sql = `select  from ListContents
-    where ShoppingListId = ${req.params.id};`;
+	console.log(user);
+	let sql = `select HouseHolds.HouseHoldId, HouseHolds.HouseHoldName, Users.UserName from InHouseHold
+					left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId
+					left join Users on InHouseHold.UserId = Users.UserId 
+					where InHouseHold.HouseHoldId = (
+					select InHouseHold.HouseHoldId from InHouseHold left join Users on InHouseHold.UserId = Users.UserId where Users.UserName = "${user.user}"
+					);`;
 	handleQuery(sql, res);
 });
 
@@ -794,7 +810,10 @@ app.post('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 
 app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
-	let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users left join HouseHolds on Users.HouseHoldId = HouseHolds.HouseHoldId where UserName = "${req.user.user}";`;
+	let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users 
+	left join InHouseHold on Users.UserId = InHouseHold.UserId
+	left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId 
+	where UserName = "${req.user.user}";`;
 	db.query(sqlUserId, (err, rows) => {
 		if (err) {
 			console.log(err);
@@ -906,7 +925,10 @@ app.post(
 	(req, res) => {
 		console.log(req.body);
 		if (req.body.startDate && req.body.endDate) {
-			let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users left join HouseHolds on Users.HouseHoldId = HouseHolds.HouseHoldId where UserName = "${req.user.user}";`;
+			let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users 
+			left join InHouseHold on Users.UserId = InHouseHold.UserId
+			left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId 
+			where UserName = "${req.user.user}";`;
 			db.query(sqlUserId, (err, rows) => {
 				if (err) {
 					console.log(err);
@@ -935,22 +957,22 @@ app.post(
 													Measurements.MeasurementName,
 													SectionOrder.OrderOfSection
 													from (
-													select distinct RecipeCalendar.RecipeCalendarId,
-													Users.UserName as IssuedUser,
-													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
-													RecipeCalendar.RecipeId,
-													RecipeCalendar.Portions as CalendarPortions,
-													Recipes.RecipePortions as RecipePortions
-													from RecipeCalendar left join
-													Users on RecipeCalendar.UserId = Users.UserId
-													join InHouseHold
-													left join Users as Users2 on InHouseHold.UserId = Users2.UserId
-													left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-													where
-													((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-													or
-													Users.UserName = "${req.user.user}") and
-													(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
+														select RecipeCalendar.RecipeCalendarId, 
+														Users.UserName as IssuedUser, 
+														Users.UserId, 
+														RecipeCalendar.RecipeDate as RecipeDate, 
+														RecipeCalendar.RecipeId, 
+														RecipeCalendar.Portions as CalendarPortions, 
+														Recipes.RecipePortions as RecipePortions
+																from RecipeCalendar 
+																left join Users on RecipeCalendar.UserId = Users.UserId 
+																left join InHouseHold on Users.UserId = InHouseHold.UserId 
+																left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+																where (Users.UserName = "${req.user.user}"
+																or InHouseHold.HouseHoldId = (
+																select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+																))
+															and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
 													) as RecipeCalendar
 													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
 													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
@@ -965,22 +987,24 @@ app.post(
 													select
 													ShoppingLists.ShoppingListId, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity
 													from (
-													select distinct RecipeCalendar.RecipeCalendarId,
-													Users.UserName as IssuedUser,
-													Users.UserId, RecipeCalendar.RecipeDate as RecipeDate,
-													RecipeCalendar.RecipeId,
-													RecipeCalendar.Portions as CalendarPortions,
-													Recipes.RecipePortions as RecipePortions
-														from RecipeCalendar left join
-														Users on RecipeCalendar.UserId = Users.UserId
-														join InHouseHold
-														left join Users as Users2 on InHouseHold.UserId = Users2.UserId
-														left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-														where
-														((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-														or
-														Users.UserName = "${req.user.user}") and
-														(RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
+
+														select RecipeCalendar.RecipeCalendarId, 
+														Users.UserName as IssuedUser, 
+														Users.UserId, 
+														RecipeCalendar.RecipeDate as RecipeDate, 
+														RecipeCalendar.RecipeId, 
+														RecipeCalendar.Portions as CalendarPortions, 
+														Recipes.RecipePortions as RecipePortions
+																from RecipeCalendar 
+																left join Users on RecipeCalendar.UserId = Users.UserId 
+																left join InHouseHold on Users.UserId = InHouseHold.UserId 
+																left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+																where (Users.UserName = "${req.user.user}"
+																or InHouseHold.HouseHoldId = (
+																select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+																))
+															and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
+
 													) as RecipeCalendar
 													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
 													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
@@ -1023,22 +1047,22 @@ app.post(
 				sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity,
 				SectionOrder.OrderOfSection
 				from (
-				select distinct RecipeCalendar.RecipeCalendarId, 
-				Users.UserName as IssuedUser, 
-				Users.UserId, RecipeCalendar.RecipeDate as RecipeDate, 
-				RecipeCalendar.RecipeId, 
-				RecipeCalendar.Portions as CalendarPortions, 
-				Recipes.RecipePortions as RecipePortions
-				from RecipeCalendar left join 
-				Users on RecipeCalendar.UserId = Users.UserId 
-				join InHouseHold 
-				left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-				left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-				where 
-				((Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${rew.user.user}")
-				or 
-				Users.UserName = "${rew.user.user}") and 
-				(RecipeCalendar.RecipeDate between "${req.body.startdate}" and "${req.body.endDate}")
+					select RecipeCalendar.RecipeCalendarId, 
+					Users.UserName as IssuedUser, 
+					Users.UserId, 
+					RecipeCalendar.RecipeDate as RecipeDate, 
+					RecipeCalendar.RecipeId, 
+					RecipeCalendar.Portions as CalendarPortions, 
+					Recipes.RecipePortions as RecipePortions
+							from RecipeCalendar 
+							left join Users on RecipeCalendar.UserId = Users.UserId 
+							left join InHouseHold on Users.UserId = InHouseHold.UserId 
+							left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+							where (Users.UserName = "${rew.user.user}"
+							or InHouseHold.HouseHoldId = (
+							select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${rew.user.user}"
+							))
+						and (RecipeCalendar.RecipeDate between "${req.body.startdate}" and "${req.body.endDate}")
 				) as RecipeCalendar
 				left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
 				left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId 
@@ -1245,17 +1269,18 @@ app.patch('/recipe', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
 	if (req.body.RecipeId) {
 		let validateSql = `select distinct Recipes.RecipeId
-		from Recipes left join 
-			Users on Recipes.RecipeOwner = Users.UserId join 
-			InHouseHold left join Users as Users2 on InHouseHold.UserId = Users2.UserId 
-		where
-			Recipes.RecipeId = ${req.body.RecipeId}
-		and
-			(Recipes.Public = true
-		or
-			(Users.HouseHoldId = Users2.HouseHoldId and Users2.UserName = "${req.user.user}")
-		or 
-			Users.UserName = "${req.user.user}");`;
+													from Recipes left join Users on Recipes.RecipeOwner = Users.UserId  
+													left join InHouseHold on Users.UserId = InHouseHold.UserId 
+													where
+														Recipes.RecipeId = ${req.body.RecipeId}
+													and
+														(Recipes.Public = true
+													or
+														(InHouseHold.HouseHoldId = (
+														select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+														))
+													or 
+														Users.UserName = "${req.user.user}");`;
 		db.query(validateSql, (err, rows) => {
 			if (err) {
 				console.log(err);

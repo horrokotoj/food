@@ -36,10 +36,7 @@ CREATE TABLE Users
     UNIQUE (UserEmail),
     Token CHAR(255),
     Verified boolean default false,
-    Pass CHAR(255) NOT NULL,
-    HouseHoldId BIGINT UNSIGNED,
-    FOREIGN KEY (HouseHoldId) REFERENCES HouseHolds (HouseHoldId)
-
+    Pass CHAR(255) NOT NULL
 );
 
 CREATE TABLE InHouseHold
@@ -225,14 +222,6 @@ VALUES
 INSERT INTO HouseHolds (HouseHoldName, HouseHoldOwner)
 VALUES
     ("Familjen Arnholm Söderberg", 1);
-
-UPDATE Users 
-    set HouseHoldId = 1
-    where UserId = 1;
-
-UPDATE Users 
-    set HouseHoldId = 1
-    where UserId = 2;
 
 INSERT INTO InHouseHold (HouseHoldId, UserId)
 VALUES
