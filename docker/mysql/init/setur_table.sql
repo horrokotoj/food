@@ -36,7 +36,8 @@ CREATE TABLE Users
     UNIQUE (UserEmail),
     Token CHAR(255),
     Verified boolean default false,
-    Pass CHAR(255) NOT NULL
+    Pass CHAR(255) NOT NULL,
+    DefaultStore BIGINT UNSIGNED default 0
 );
 
 CREATE TABLE InHouseHold

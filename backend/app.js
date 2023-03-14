@@ -416,7 +416,7 @@ app.get('/recipes', authenticate.authenticateToken, (req, res) => {
 								Recipes.Public = true
 							or 
 							InHouseHold.HouseHoldId = (
-							select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+							select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}" and InHouseHold.Verified = 1
 							)
 							or Users.UserName = "${req.user.user}";`;
 	handleQuery(sql, res);
@@ -498,7 +498,7 @@ app.get('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 						left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
 						where Users.UserName = "${req.user.user}"
 						or InHouseHold.HouseHoldId = (
-						select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}");`;
+						select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}" and InHouseHold.Verified = 1);`;
 	handleQuery(sql, res);
 });
 
@@ -531,7 +531,7 @@ app.get(
 			left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
 			where (Users.UserName = "${req.user.user}"
 			or InHouseHold.HouseHoldId = (
-			select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+			select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user} and InHouseHold.Verified = 1"
 			))
 		and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}");
 			`;
@@ -554,7 +554,7 @@ app.get('/shoppinglists', authenticate.authenticateToken, (req, res) => {
 		left join Users on ShoppingLists.UserId = Users.UserId
 		left join InHouseHold on Users.UserId = InHouseHold.UserId
 		where (
-		select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+		select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}" and InHouseHold.Verified = 1
 		)
 		or
 		Users.UserName = "${req.user.user}";`;
@@ -582,7 +582,7 @@ app.get(
 					left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
 					where (Users.UserName = "${req.user.user}"
 					or InHouseHold.HouseHoldId = (
-					select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
+					select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}" and InHouseHold.Verified = 1
 					))
 				and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
 			) as RecipeCalendar
@@ -619,7 +619,7 @@ app.get('/household', authenticate.authenticateToken, (req, res) => {
 					left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId
 					left join Users on InHouseHold.UserId = Users.UserId 
 					where InHouseHold.HouseHoldId = (
-					select InHouseHold.HouseHoldId from InHouseHold left join Users on InHouseHold.UserId = Users.UserId where Users.UserName = "${user.user}"
+					select InHouseHold.HouseHoldId from InHouseHold left join Users on InHouseHold.UserId = Users.UserId where Users.UserName = "${user.user}" and InHouseHold.Verified = 1
 					);`;
 	handleQuery(sql, res);
 });
@@ -810,8 +810,8 @@ app.post('/recipecalendar', authenticate.authenticateToken, (req, res) => {
 
 app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 	console.log(req.body);
-	let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users 
-	left join InHouseHold on Users.UserId = InHouseHold.UserId
+	let sqlUserId = `select Users.UserId, Users.DefaultStore as UsersDefaultStore, HouseHolds.DefaultStore from Users 
+	left join InHouseHold on Users.UserId = InHouseHold.UserId and InHouseHold.Verified = 1
 	left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId 
 	where UserName = "${req.user.user}";`;
 	db.query(sqlUserId, (err, rows) => {
@@ -820,9 +820,19 @@ app.post('/shoppinglist', authenticate.authenticateToken, (req, res) => {
 			res.sendStatus(500);
 		} else {
 			//
+			console.log(rows.length);
+
 			if (rows.length === 1) {
+				console.log(rows[0]);
 				let UserId = rows[0].UserId;
-				let StoreId = rows[0].DefaultStore;
+				let StoreId;
+				if (rows[0].DefaultStore) {
+					StoreId = rows[0].DefaultStore;
+				} else if (rows[0].UsersDefaultStore != null) {
+					StoreId = rows[0].UsersDefaultStore;
+				} else {
+					res.sendStatus(500);
+				}
 				let sql;
 				if (req.body.ShoppingListName) {
 					if (req.body.StartDate && req.body.EndDate) {
@@ -925,8 +935,8 @@ app.post(
 	(req, res) => {
 		console.log(req.body);
 		if (req.body.startDate && req.body.endDate) {
-			let sqlUserId = `select Users.UserId, HouseHolds.DefaultStore from Users 
-			left join InHouseHold on Users.UserId = InHouseHold.UserId
+			let sqlUserId = `select Users.UserId, Users.DefaultStore as UsersDefaultStore, HouseHolds.DefaultStore from Users 
+			left join InHouseHold on Users.UserId = InHouseHold.UserId and InHouseHold.Verified = 1
 			left join HouseHolds on InHouseHold.HouseHoldId = HouseHolds.HouseHoldId 
 			where UserName = "${req.user.user}";`;
 			db.query(sqlUserId, (err, rows) => {
@@ -936,7 +946,15 @@ app.post(
 				} else {
 					if (rows.length === 1) {
 						let UserId = rows[0].UserId;
-						let StoreId = rows[0].DefaultStore;
+						let StoreId;
+						if (rows[0].DefaultStore) {
+							StoreId = rows[0].DefaultStore;
+						} else if (rows[0].UsersDefaultStore != null) {
+							StoreId = rows[0].UsersDefaultStore;
+						} else {
+							res.sendStatus(500);
+						}
+						console.log(StoreId);
 						let sqlList = `insert into ShoppingLists (ShoppingListName, StartDate, EndDate, UserId, StoreId)
 							values
 							("${req.body.startDate} - ${req.body.endDate}", "${req.body.startDate}", "${req.body.endDate}", ${UserId}, ${StoreId});`;
@@ -945,73 +963,51 @@ app.post(
 								console.log(err);
 								res.sendStatus(500);
 							} else {
+								console.log('here');
 								let ShoppingListId = rows.insertId;
-								let sql;
-								if (StoreId) {
-									sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, MeasurementName, Indexx)
-													(select
-													ShoppingLists.ShoppingListId,
-													Ingredients.IngredientId,
-													Ingredients.IngredientName,
-													sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity,
-													Measurements.MeasurementName,
-													SectionOrder.OrderOfSection
-													from (
-														select RecipeCalendar.RecipeCalendarId, 
-														Users.UserName as IssuedUser, 
-														Users.UserId, 
-														RecipeCalendar.RecipeDate as RecipeDate, 
-														RecipeCalendar.RecipeId, 
-														RecipeCalendar.Portions as CalendarPortions, 
-														Recipes.RecipePortions as RecipePortions
-																from RecipeCalendar 
-																left join Users on RecipeCalendar.UserId = Users.UserId 
-																left join InHouseHold on Users.UserId = InHouseHold.UserId 
-																left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-																where (Users.UserName = "${req.user.user}"
-																or InHouseHold.HouseHoldId = (
-																select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
-																))
-															and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
-													) as RecipeCalendar
-													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
-													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
-													left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId
-													left join SectionOrder on Ingredients.StoreSectionId = SectionOrder.StoreSectionId
-													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
-													where SectionOrder.StoreId = ${StoreId}
-													group by Ingredients.IngredientName);`;
-								} else {
-									sql = `insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity)
-													(
-													select
-													ShoppingLists.ShoppingListId, Ingredients.IngredientId, Ingredients.IngredientName, sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity
-													from (
+								console.log(ShoppingListId);
+								console.log(StoreId);
+								console.log(req.user.user);
+								console.log(req.body.startDate);
+								console.log(req.body.startDate);
 
-														select RecipeCalendar.RecipeCalendarId, 
-														Users.UserName as IssuedUser, 
-														Users.UserId, 
-														RecipeCalendar.RecipeDate as RecipeDate, 
-														RecipeCalendar.RecipeId, 
-														RecipeCalendar.Portions as CalendarPortions, 
-														Recipes.RecipePortions as RecipePortions
-																from RecipeCalendar 
-																left join Users on RecipeCalendar.UserId = Users.UserId 
-																left join InHouseHold on Users.UserId = InHouseHold.UserId 
-																left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
-																where (Users.UserName = "${req.user.user}"
-																or InHouseHold.HouseHoldId = (
-																select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}"
-																))
-															and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.startDate}")
+								let sql = `
+													
+													insert into ListContents (ShoppingListId, IngredientId, IngredientName, Quantity, MeasurementName, Indexx) (
+														select
+																	ShoppingLists.ShoppingListId,
+																	Ingredients.IngredientId,
+																	Ingredients.IngredientName,
+																	sum((RecipeCalendar.CalendarPortions/RecipeCalendar.RecipePortions*RecipeIngredients.Quantity)) as Quantity,
+																	Measurements.MeasurementName,
+																	SectionOrder.OrderOfSection
+																	from (
+																	select RecipeCalendar.RecipeCalendarId, 
+																	Users.UserName as IssuedUser, 
+																	Users.UserId, 
+																	RecipeCalendar.RecipeDate as RecipeDate, 
+																	RecipeCalendar.RecipeId, 
+																	RecipeCalendar.Portions as CalendarPortions, 
+																	Recipes.RecipePortions as RecipePortions
+																		from RecipeCalendar 
+																			left join Users on RecipeCalendar.UserId = Users.UserId 
+																			left join InHouseHold on Users.UserId = InHouseHold.UserId 
+																			left join Recipes on RecipeCalendar.RecipeId = Recipes.RecipeId
+																			where (Users.UserName = "${req.user.user}"
+																			or InHouseHold.HouseHoldId = (
+																			select InHouseHold.HouseHoldId from Users left join InHouseHold on Users.UserId = InHouseHold.UserId where Users.UserName = "${req.user.user}" and InHouseHold.Verified = 1
+																						))
+																					and (RecipeCalendar.RecipeDate between "${req.body.startDate}" and "${req.body.endDate}")
+																					) as RecipeCalendar
+																					left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
+																					left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
+																					left join Measurements on Ingredients.MeasurementId = Measurements.MeasurementId
+																					left join SectionOrder on Ingredients.StoreSectionId = SectionOrder.StoreSectionId
+																					left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
+																					where SectionOrder.StoreId = ${StoreId}
+																					group by Ingredients.IngredientName
+														);`;
 
-													) as RecipeCalendar
-													left join RecipeIngredients on RecipeCalendar.RecipeId = RecipeIngredients.RecipeId
-													left join Ingredients on RecipeIngredients.IngredientId = Ingredients.IngredientId
-													left join ShoppingLists on ShoppingLists.ShoppingListId = ${ShoppingListId}
-													group by Ingredients.IngredientName
-													);`;
-								}
 								handleQuery(sql, res);
 							}
 						});
