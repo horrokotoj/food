@@ -10,13 +10,15 @@ Requires npm version 8.5.5
 
 `nvm use --lts`
 
-`npm install --save express bcrypt dotenv express jsonwebtoken mysql2 `
+`npm install --save express bcrypt dotenv express jsonwebtoken mysql2 nodemailer`
 
 ## To run server
 
 ### Environment
 
 A .env file which contains
+
+`URL`
 
 `APP_PORT`
 
@@ -25,6 +27,24 @@ A .env file which contains
 `ACCESS_TOKEN_SECRET`
 
 `REFRESH_TOKEN_SECRET`
+
+`EMAIL_SECRET`
+
+`DB_HOST`
+
+`DB_USER`
+
+`DB_PASS`
+
+`DB`
+
+`VER_EMAIL`
+
+`VER_PASS`
+
+`VER_HOST`
+
+`VER_PORT`
 
 Generate a token with:
 

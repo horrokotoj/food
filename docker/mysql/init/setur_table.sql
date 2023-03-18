@@ -44,6 +44,7 @@ CREATE TABLE InHouseHold
 (
     HouseHoldId BIGINT UNSIGNED NOT NULL,
     UserId BIGINT UNSIGNED NOT NULL,
+    Verified boolean default false,
     CONSTRAINT PK_InHouseHold PRIMARY KEY
 	(
 			HouseHoldId,
@@ -224,10 +225,10 @@ INSERT INTO HouseHolds (HouseHoldName, HouseHoldOwner)
 VALUES
     ("Familjen Arnholm Söderberg", 1);
 
-INSERT INTO InHouseHold (HouseHoldId, UserId)
+INSERT INTO InHouseHold (HouseHoldId, UserId, Verified)
 VALUES
-    (1, 1),
-    (1, 2);
+    (1, 1, 1),
+    (1, 2, 1);
 
 INSERT INTO Recipes (RecipeName,
     RecipeDesc,
